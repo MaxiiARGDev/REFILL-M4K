@@ -23,6 +23,8 @@ public final class LootRefillPlugin extends JavaPlugin {
     private DatabaseManager databaseManager;
     private LootTableStorage lootTableStorage;
     private LootManager lootManager;
+    private com.arcraft.lootrefill.pool.LootPoolStorage lootPoolStorage;
+    private com.arcraft.lootrefill.pool.LootPoolManager lootPoolManager;
     private ContainerManager containerManager;
     private ContainerRegistry containerRegistry;
     private RefillManager refillManager;
@@ -43,10 +45,14 @@ public final class LootRefillPlugin extends JavaPlugin {
         this.databaseManager = new DatabaseManager(this);
         this.databaseManager.initialize();
 
-        // 3. Inicializar managers de Loot y Contenedores
+        // 3. Inicializar managers de Loot, Pools y Contenedores
         this.lootTableStorage = new LootTableStorage(this, databaseManager);
         this.lootManager = new LootManager(this, lootTableStorage);
         this.lootManager.load();
+
+        this.lootPoolStorage = new com.arcraft.lootrefill.pool.LootPoolStorage(this, databaseManager);
+        this.lootPoolManager = new com.arcraft.lootrefill.pool.LootPoolManager(this, lootPoolStorage);
+        this.lootPoolManager.load();
 
         this.containerManager = new ContainerManager(this, databaseManager);
         this.containerManager.load();
@@ -123,6 +129,7 @@ public final class LootRefillPlugin extends JavaPlugin {
     public void reloadPluginConfig() {
         reloadConfig();
         lootManager.load();
+        lootPoolManager.load();
         containerManager.load();
         refillManager.loadConfig();
         refillManager.start();
@@ -138,6 +145,10 @@ public final class LootRefillPlugin extends JavaPlugin {
 
     public LootManager getLootManager() {
         return lootManager;
+    }
+
+    public com.arcraft.lootrefill.pool.LootPoolManager getLootPoolManager() {
+        return lootPoolManager;
     }
 
     public ContainerManager getContainerManager() {

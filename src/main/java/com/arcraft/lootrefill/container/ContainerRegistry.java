@@ -96,7 +96,8 @@ public class ContainerRegistry {
             existing.setStatus(ContainerStatus.ACTIVE);
             existing.setManaged(false);
             existing.setRegistered(false);
-            existing.setLootTableId("");
+            existing.setLootTableId(null);
+            existing.setNextRefill(null);
             existing.setRefillEnabled(false);
             existing.setUpdatedAt(now);
             containerManager.saveContainer(existing);

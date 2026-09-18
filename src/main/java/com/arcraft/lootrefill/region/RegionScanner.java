@@ -81,13 +81,14 @@ public class RegionScanner {
         MessageUtil.sendMessage(player, "&7Inspeccionando &e" + totalChunks + " &7chunks intersecantes de forma progresiva...");
 
         List<LootContainer> newCandidates = Collections.synchronizedList(new ArrayList<>());
+        List<LootContainer> playerCandidates = Collections.synchronizedList(new ArrayList<>());
         Set<String> processedDoubleChests = Collections.synchronizedSet(new HashSet<>());
         Map<ContainerType, Integer> countersByType = new EnumMap<>(ContainerType.class);
         for (ContainerType type : ContainerType.values()) {
             countersByType.put(type, 0);
         }
 
-        int[] statsCounters = new int[3]; // [0] = alreadyMap, [1] = player, [2] = broken
+        int[] statsCounters = new int[2]; // [0] = alreadyMap, [1] = broken
 
         long maxNanosPerTick = plugin.getConfig().getLong("scanner.max-ms-per-tick", 5) * 1_000_000L;
         long now = System.currentTimeMillis();
@@ -121,7 +122,7 @@ public class RegionScanner {
 
                     if (world.isChunkLoaded(cx, cz)) {
                         Chunk chunk = world.getChunkAt(cx, cz);
-                        inspectChunk(chunk, world, selection, newCandidates, processedDoubleChests, countersByType, statsCounters, now);
+                        inspectChunk(chunk, world, selection, newCandidates, playerCandidates, processedDoubleChests, countersByType, statsCounters, now);
                         chunkIndex++;
                     } else {
                         chunkLoading.set(true);
@@ -129,7 +130,7 @@ public class RegionScanner {
                             Bukkit.getScheduler().runTask(plugin, () -> {
                                 try {
                                     if (loadedChunk != null && loadedChunk.isLoaded()) {
-                                        inspectChunk(loadedChunk, world, selection, newCandidates, processedDoubleChests, countersByType, statsCounters, now);
+                                        inspectChunk(loadedChunk, world, selection, newCandidates, playerCandidates, processedDoubleChests, countersByType, statsCounters, now);
                                         world.unloadChunkRequest(cx, cz);
                                     }
                                 } finally {
@@ -153,9 +154,9 @@ public class RegionScanner {
                 RegionScanResult result = new RegionScanResult(
                         selection,
                         newCandidates,
+                        playerCandidates,
                         statsCounters[0],
                         statsCounters[1],
-                        statsCounters[2],
                         countersByType
                 );
 
@@ -169,6 +170,7 @@ public class RegionScanner {
                               World world,
                               RegionSelection selection,
                               List<LootContainer> newCandidates,
+                              List<LootContainer> playerCandidates,
                               Set<String> processedDoubleChests,
                               Map<ContainerType, Integer> countersByType,
                               int[] statsCounters,
@@ -212,9 +214,9 @@ public class RegionScanner {
 
             if (existing != null) {
                 if (existing.getSource() == ContainerSource.PLAYER) {
-                    statsCounters[1]++; // PLAYER
+                    playerCandidates.add(existing);
                 } else if (existing.getStatus() == ContainerStatus.BROKEN) {
-                    statsCounters[2]++; // BROKEN
+                    statsCounters[1]++; // BROKEN
                 } else if (existing.getSource() == ContainerSource.MAP) {
                     statsCounters[0]++; // ALREADY_MAP
                 }
@@ -230,11 +232,11 @@ public class RegionScanner {
                         by,
                         bz,
                         type,
-                        "", // Sin loot table asignada aún (Etapa 4.1)
+                        null, // NULL loot table per Ajuste 4.1.1
                         true,
                         false,
                         0L,
-                        now, // Inmediatamente elegible para futuro refill
+                        null, // NULL nextRefill per Ajuste 4.1.1 (hasta que se configure loot)
                         refillEnabled,
                         interval,
                         ContainerSource.MAP,
@@ -268,16 +270,23 @@ public class RegionScanner {
         MessageUtil.sendRaw(player, "");
         MessageUtil.sendRaw(player, "&7Estado de registro en la región:");
         MessageUtil.sendRaw(player, "  &8• &7Ya registrados como MAP: &a" + result.getAlreadyMapCount() + " &7(Se conservan intactos)");
-        MessageUtil.sendRaw(player, "  &8• &cProtegidos de jugadores (PLAYER): &f" + result.getPlayerCount() + " &7(Inmodificables)");
+        MessageUtil.sendRaw(player, "  &8• &cProtegidos de jugadores (PLAYER): &f" + result.getPlayerCount() + " &7(Protegidos por defecto)");
         MessageUtil.sendRaw(player, "  &8• &8Marcados previamente como rotos (BROKEN): &f" + result.getBrokenCount() + " &7(Intactos)");
         MessageUtil.sendRaw(player, "  &8• &eNuevos candidatos a registrar como MAP: &6" + result.getNewCandidates().size());
         MessageUtil.sendRaw(player, "");
 
-        if (result.getNewCandidates().isEmpty()) {
-            MessageUtil.sendRaw(player, "&eNo se detectaron contenedores nuevos para registrar en esta región.");
+        if (result.getNewCandidates().isEmpty() && result.getPlayerCount() == 0) {
+            MessageUtil.sendRaw(player, "&eNo se detectaron contenedores nuevos ni PLAYER para procesar en esta región.");
         } else {
-            MessageUtil.sendRaw(player, "&aPara registrar los &e" + result.getNewCandidates().size() + " &anuevos contenedores como MAP:");
-            MessageUtil.sendRaw(player, "&e/loot region assign");
+            if (!result.getNewCandidates().isEmpty()) {
+                MessageUtil.sendRaw(player, "&aPara registrar los &e" + result.getNewCandidates().size() + " &anuevos contenedores como MAP:");
+                MessageUtil.sendRaw(player, "  &8» &e/loot region assign confirm");
+            }
+            if (result.getPlayerCount() > 0) {
+                MessageUtil.sendRaw(player, "&cOpción administrativa PLAYER → MAP:");
+                MessageUtil.sendRaw(player, "&7Para convertir explícitamente los &e" + result.getPlayerCount() + " &7PLAYER a MAP (conservando inventarios):");
+                MessageUtil.sendRaw(player, "  &8» &e/loot region assign confirm-player");
+            }
         }
         MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
@@ -295,8 +304,28 @@ public class RegionScanner {
             return;
         }
 
-        boolean confirm = args.length >= 3 && args[2].equalsIgnoreCase("confirm");
+        boolean confirmPlayer = args.length >= 3 && args[2].equalsIgnoreCase("confirm-player");
+        if (confirmPlayer) {
+            List<LootContainer> playerList = result.getPlayerCandidates();
+            if (playerList.isEmpty()) {
+                MessageUtil.sendMessage(player, "&eNo hay contenedores PLAYER para convertir en la región seleccionada.");
+                return;
+            }
 
+            int converted = containerManager.convertPlayerContainersToMap(playerList);
+
+            MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            MessageUtil.sendRaw(player, "&6&lLootRefill » Conversión PLAYER → MAP Confirmada");
+            MessageUtil.sendRaw(player, "&a¡Se convirtieron exitosamente &e" + converted + " &acontenedores PLAYER a MAP!");
+            MessageUtil.sendRaw(player, "&7Estado: &fACTIVE &8| &7Managed: &ftrue &8| &7Registered: &ftrue");
+            MessageUtil.sendRaw(player, "&7Loot Table: &cSin Loot configurado &7(next_refill: NULL)");
+            MessageUtil.sendRaw(player, "&aEl inventario existente de cada contenedor fue conservado intacto.");
+            MessageUtil.sendRaw(player, "&7Usa &e/loot assign &7para asignarles tablas de loot cuando lo desees.");
+            MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            return;
+        }
+
+        boolean confirm = args.length >= 3 && args[2].equalsIgnoreCase("confirm");
         if (!confirm) {
             // Modo Preview
             MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -305,23 +334,31 @@ public class RegionScanner {
             MessageUtil.sendRaw(player, "&7Total en región: &f" + result.getTotalContainers());
             MessageUtil.sendRaw(player, "");
             MessageUtil.sendRaw(player, "&7Contenedores MAP existentes: &a" + result.getAlreadyMapCount() + " &7(Se mantendrán)");
-            MessageUtil.sendRaw(player, "&7Contenedores PLAYER: &c" + result.getPlayerCount() + " &7(Protegidos, JAMÁS se convertirán a MAP)");
+            MessageUtil.sendRaw(player, "&7Contenedores PLAYER: &c" + result.getPlayerCount() + " &7(Protegidos por defecto)");
             MessageUtil.sendRaw(player, "&7Contenedores BROKEN: &8" + result.getBrokenCount() + " &7(Permanecerán rotos)");
             MessageUtil.sendRaw(player, "&7Nuevos contenedores a registrar como MAP: &e" + result.getNewCandidates().size());
             MessageUtil.sendRaw(player, "");
 
-            if (result.getNewCandidates().isEmpty()) {
-                MessageUtil.sendRaw(player, "&eNo hay nuevos contenedores para registrar.");
+            if (result.getNewCandidates().isEmpty() && result.getPlayerCount() == 0) {
+                MessageUtil.sendRaw(player, "&eNo hay nuevos contenedores ni PLAYER para procesar en esta región.");
             } else {
                 MessageUtil.sendRaw(player, "&aNingún contenedor fue modificado todavía. &7(Modo Preview)");
-                MessageUtil.sendRaw(player, "&7Para registrar definitivamente los &e" + result.getNewCandidates().size() + " &7contenedores nuevos ejecuta:");
-                MessageUtil.sendRaw(player, "&e/loot region assign confirm");
+                if (!result.getNewCandidates().isEmpty()) {
+                    MessageUtil.sendRaw(player, "&7Para registrar los &e" + result.getNewCandidates().size() + " &7nuevos candidatos como MAP ejecuta:");
+                    MessageUtil.sendRaw(player, "  &8» &e/loot region assign confirm");
+                }
+                if (result.getPlayerCount() > 0) {
+                    MessageUtil.sendRaw(player, "");
+                    MessageUtil.sendRaw(player, "&cOpción administrativa PLAYER → MAP:");
+                    MessageUtil.sendRaw(player, "&7Para convertir los &e" + result.getPlayerCount() + " &7PLAYER a MAP (conservando inventarios):");
+                    MessageUtil.sendRaw(player, "  &8» &e/loot region assign confirm-player");
+                }
             }
             MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             return;
         }
 
-        // Modo Confirmación Real
+        // Modo Confirmación Real (registra únicamente newCandidates)
         List<LootContainer> candidates = result.getNewCandidates();
         if (candidates.isEmpty()) {
             MessageUtil.sendMessage(player, "&eNo hay contenedores nuevos para registrar en la región.");
@@ -334,10 +371,96 @@ public class RegionScanner {
         MessageUtil.sendRaw(player, "&6&lLootRefill » Asignación Regional Confirmada");
         MessageUtil.sendRaw(player, "&a¡Se registraron exitosamente &e" + savedCount + " &anuevos contenedores como MAP!");
         MessageUtil.sendRaw(player, "&7Estado: &fACTIVE &8| &7Managed: &ftrue &8| &7Registered: &ftrue");
-        MessageUtil.sendRaw(player, "&7Loot Table: &eSin tabla aún &7(Usa &e/loot assign &7para asignarles loot)");
+        MessageUtil.sendRaw(player, "&7Loot Table: &cSin Loot configurado &7(next_refill: NULL)");
+        MessageUtil.sendRaw(player, "&7Usa &e/loot assign &7para asignarles tablas de loot.");
         MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         // Limpiar candidatos asignados
+        regionManager.setLastScanResult(player.getUniqueId(), null);
+    }
+
+    public void handleAssignPoolCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            MessageUtil.sendMessage(sender, "&cEste comando solo puede ser ejecutado por un jugador.");
+            return;
+        }
+
+        if (args.length < 3) {
+            MessageUtil.sendMessage(player, "&cUso: &e/loot region assign-pool <pool> [preview|confirm]");
+            return;
+        }
+
+        String poolId = args[2].toLowerCase();
+        if (!plugin.getLootPoolManager().poolExists(poolId)) {
+            MessageUtil.sendMessage(player, "&cEl Loot Pool '&e" + poolId + "&c' no existe. Pools disponibles: &f"
+                    + String.join(", ", plugin.getLootPoolManager().getPoolIds()));
+            return;
+        }
+
+        RegionScanResult result = regionManager.getLastScanResult(player.getUniqueId());
+        if (result == null) {
+            MessageUtil.sendMessage(player, "&cNo tienes ningún escaneo regional reciente.");
+            MessageUtil.sendMessage(player, "&7Primero selecciona la región con la varita (&e/loot wand&7) y ejecuta &e/loot region scan&7.");
+            return;
+        }
+
+        RegionSelection sel = result.getSelection();
+        List<LootContainer> targetContainers = new ArrayList<>(result.getNewCandidates());
+
+        for (LootContainer c : containerManager.getAllContainers()) {
+            if (c.getWorld().equalsIgnoreCase(sel.getWorld().getName())
+                    && c.getSource() == ContainerSource.MAP
+                    && c.getStatus() == ContainerStatus.ACTIVE
+                    && c.isManaged()
+                    && sel.contains(c.getX(), c.getY(), c.getZ())) {
+                if (!targetContainers.contains(c)) {
+                    targetContainers.add(c);
+                }
+            }
+        }
+
+        boolean confirm = args.length >= 4 && args[3].equalsIgnoreCase("confirm");
+        if (!confirm) {
+            // Modo Preview
+            MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            MessageUtil.sendRaw(player, "&6&lLootRefill » Vista Previa Asignación de Pool Regional");
+            MessageUtil.sendRaw(player, "&7Mundo: &e" + sel.getWorld().getName());
+            MessageUtil.sendRaw(player, "&7Loot Pool objetivo: &e" + poolId.toUpperCase());
+            MessageUtil.sendRaw(player, "&7Total contenedores MAP elegibles en región: &a" + targetContainers.size());
+            MessageUtil.sendRaw(player, "&7Nuevos candidatos: &f" + result.getNewCandidates().size() + " &8| &7Existentes: &f" + (targetContainers.size() - result.getNewCandidates().size()));
+            MessageUtil.sendRaw(player, "");
+            MessageUtil.sendRaw(player, "&aNingún contenedor fue modificado todavía. &7(Modo Preview)");
+            MessageUtil.sendRaw(player, "&7Para confirmar y asignar el pool ejecuta:");
+            MessageUtil.sendRaw(player, "  &8» &e/loot region assign-pool " + poolId + " confirm");
+            MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            return;
+        }
+
+        // Modo Confirmación Real
+        if (targetContainers.isEmpty()) {
+            MessageUtil.sendMessage(player, "&eNo hay contenedores MAP elegibles en la región para asignar el pool.");
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        for (LootContainer c : targetContainers) {
+            c.setLootPoolId(poolId);
+            c.setManaged(true);
+            c.setRegistered(true);
+            c.setRefillEnabled(true);
+            c.setNextRefill(now);
+            c.setUpdatedAt(now);
+        }
+
+        int savedCount = containerManager.saveContainersBatch(targetContainers);
+
+        MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        MessageUtil.sendRaw(player, "&6&lLootRefill » Asignación de Pool Regional Confirmada");
+        MessageUtil.sendRaw(player, "&a¡Se asignó el Loot Pool &e" + poolId.toUpperCase() + " &aa &e" + savedCount + " &acontenedores MAP en la región!");
+        MessageUtil.sendRaw(player, "&7Estado: &fACTIVE &8| &7Managed: &ftrue &8| &7Refill Enabled: &atrue");
+        MessageUtil.sendRaw(player, "&7Próximo refill: &aProgramado de inmediato (vencido)");
+        MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
         regionManager.setLastScanResult(player.getUniqueId(), null);
     }
 }

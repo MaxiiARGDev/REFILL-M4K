@@ -15,10 +15,11 @@ public class LootContainer {
     private final int z;
     private ContainerType containerType;
     private String lootTableId;
+    private String lootPoolId;
     private boolean enabled;
     private boolean looted;
     private long lastLoot;
-    private long nextRefill;
+    private Long nextRefill;
     private boolean refillEnabled;
     private int refillIntervalSeconds;
 
@@ -30,22 +31,30 @@ public class LootContainer {
     private final long createdAt;
     private long updatedAt;
 
-    public LootContainer(UUID id, String world, int x, int y, int z, ContainerType containerType, String lootTableId, boolean enabled, boolean looted, long lastLoot, long nextRefill) {
-        this(id, world, x, y, z, containerType, lootTableId, enabled, looted, lastLoot, nextRefill, true, 1800, ContainerSource.MAP, ContainerStatus.ACTIVE, true, true, System.currentTimeMillis(), System.currentTimeMillis());
+    // Historial de selección de pool para debug y auditoría (últimas 5 selecciones)
+    private final java.util.Deque<String> recentSelections = new java.util.concurrent.ConcurrentLinkedDeque<>();
+
+    public LootContainer(UUID id, String world, int x, int y, int z, ContainerType containerType, String lootTableId, boolean enabled, boolean looted, long lastLoot, Long nextRefill) {
+        this(id, world, x, y, z, containerType, lootTableId, null, enabled, looted, lastLoot, nextRefill, true, 1800, ContainerSource.MAP, ContainerStatus.ACTIVE, true, true, System.currentTimeMillis(), System.currentTimeMillis());
     }
 
-    public LootContainer(UUID id, String world, int x, int y, int z, ContainerType containerType, String lootTableId, boolean enabled, boolean looted, long lastLoot, long nextRefill, boolean refillEnabled, int refillIntervalSeconds) {
-        this(id, world, x, y, z, containerType, lootTableId, enabled, looted, lastLoot, nextRefill, refillEnabled, refillIntervalSeconds, ContainerSource.MAP, ContainerStatus.ACTIVE, true, true, System.currentTimeMillis(), System.currentTimeMillis());
+    public LootContainer(UUID id, String world, int x, int y, int z, ContainerType containerType, String lootTableId, boolean enabled, boolean looted, long lastLoot, Long nextRefill, boolean refillEnabled, int refillIntervalSeconds) {
+        this(id, world, x, y, z, containerType, lootTableId, null, enabled, looted, lastLoot, nextRefill, refillEnabled, refillIntervalSeconds, ContainerSource.MAP, ContainerStatus.ACTIVE, true, true, System.currentTimeMillis(), System.currentTimeMillis());
     }
 
-    public LootContainer(UUID id, String world, int x, int y, int z, ContainerType containerType, String lootTableId, boolean enabled, boolean looted, long lastLoot, long nextRefill, boolean refillEnabled, int refillIntervalSeconds, ContainerSource source, ContainerStatus status, boolean managed, boolean registered, long createdAt, long updatedAt) {
+    public LootContainer(UUID id, String world, int x, int y, int z, ContainerType containerType, String lootTableId, boolean enabled, boolean looted, long lastLoot, Long nextRefill, boolean refillEnabled, int refillIntervalSeconds, ContainerSource source, ContainerStatus status, boolean managed, boolean registered, long createdAt, long updatedAt) {
+        this(id, world, x, y, z, containerType, lootTableId, null, enabled, looted, lastLoot, nextRefill, refillEnabled, refillIntervalSeconds, source, status, managed, registered, createdAt, updatedAt);
+    }
+
+    public LootContainer(UUID id, String world, int x, int y, int z, ContainerType containerType, String lootTableId, String lootPoolId, boolean enabled, boolean looted, long lastLoot, Long nextRefill, boolean refillEnabled, int refillIntervalSeconds, ContainerSource source, ContainerStatus status, boolean managed, boolean registered, long createdAt, long updatedAt) {
         this.id = id != null ? id : UUID.randomUUID();
         this.world = world != null ? world : "world";
         this.x = x;
         this.y = y;
         this.z = z;
         this.containerType = containerType != null ? containerType : ContainerType.CHEST;
-        this.lootTableId = lootTableId != null ? lootTableId : "";
+        this.lootTableId = (lootTableId != null && !lootTableId.trim().isEmpty()) ? lootTableId.trim() : null;
+        this.lootPoolId = (lootPoolId != null && !lootPoolId.trim().isEmpty()) ? lootPoolId.trim().toLowerCase() : null;
         this.enabled = enabled;
         this.looted = looted;
         this.lastLoot = lastLoot;
@@ -63,21 +72,52 @@ public class LootContainer {
     public static LootContainer fromLocation(Location loc, ContainerType type, String lootTableId) {
         String worldName = loc.getWorld() != null ? loc.getWorld().getName() : "world";
         long now = System.currentTimeMillis();
-        return new LootContainer(UUID.randomUUID(), worldName, loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), type, lootTableId, true, false, 0L, 0L, true, 1800, ContainerSource.MAP, ContainerStatus.ACTIVE, true, true, now, now);
+        return new LootContainer(UUID.randomUUID(), worldName, loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), type, lootTableId, null, true, false, 0L, null, true, 1800, ContainerSource.MAP, ContainerStatus.ACTIVE, true, true, now, now);
+    }
+
+    public static LootContainer fromLocationWithPool(Location loc, ContainerType type, String lootPoolId) {
+        String worldName = loc.getWorld() != null ? loc.getWorld().getName() : "world";
+        long now = System.currentTimeMillis();
+        return new LootContainer(UUID.randomUUID(), worldName, loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), type, null, lootPoolId, true, false, 0L, null, true, 1800, ContainerSource.MAP, ContainerStatus.ACTIVE, true, true, now, now);
     }
 
     public static LootContainer createPlayerContainer(Location loc, ContainerType type) {
         String worldName = loc.getWorld() != null ? loc.getWorld().getName() : "world";
         long now = System.currentTimeMillis();
-        return new LootContainer(UUID.randomUUID(), worldName, loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), type, "", false, false, 0L, 0L, false, 1800, ContainerSource.PLAYER, ContainerStatus.ACTIVE, false, false, now, now);
+        return new LootContainer(UUID.randomUUID(), worldName, loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), type, null, null, false, false, 0L, null, false, 1800, ContainerSource.PLAYER, ContainerStatus.ACTIVE, false, false, now, now);
+    }
+
+    public boolean hasLootConfigured() {
+        return (lootPoolId != null && !lootPoolId.trim().isEmpty())
+            || (lootTableId != null && !lootTableId.trim().isEmpty());
     }
 
     public boolean isAdministrable() {
-        return registered && managed && source == ContainerSource.MAP && status == ContainerStatus.ACTIVE && lootTableId != null && !lootTableId.isEmpty();
+        return registered && managed && source == ContainerSource.MAP && status == ContainerStatus.ACTIVE;
+    }
+
+    public boolean isDue() {
+        return nextRefill != null && nextRefill <= System.currentTimeMillis();
     }
 
     public boolean isEligibleForRefill() {
-        return isAdministrable() && refillEnabled && nextRefill <= System.currentTimeMillis();
+        return isAdministrable() && refillEnabled && hasLootConfigured() && isDue();
+    }
+
+    public String getEligibilityReason() {
+        if (source != ContainerSource.MAP) return "source (" + source + ") != MAP";
+        if (status != ContainerStatus.ACTIVE) return "status (" + status + ") != ACTIVE";
+        if (!managed) return "managed = false";
+        if (!registered) return "registered = false";
+        if (!refillEnabled) return "refill_enabled = false";
+        if (!hasLootConfigured()) return "Sin Loot configurado (loot_table_id y loot_pool_id son null)";
+        if (nextRefill == null) return "next_refill es null";
+        long now = System.currentTimeMillis();
+        if (nextRefill > now) {
+            long diffSec = (nextRefill - now) / 1000;
+            return "next_refill en el futuro (faltan " + diffSec + "s / " + (diffSec / 60) + "m)";
+        }
+        return "ELEGIBLE_AND_DUE";
     }
 
     public UUID getId() {
@@ -114,8 +154,29 @@ public class LootContainer {
     }
 
     public void setLootTableId(String lootTableId) {
-        this.lootTableId = lootTableId != null ? lootTableId : "";
+        this.lootTableId = (lootTableId != null && !lootTableId.trim().isEmpty()) ? lootTableId.trim() : null;
         this.updatedAt = System.currentTimeMillis();
+    }
+
+    public String getLootPoolId() {
+        return lootPoolId;
+    }
+
+    public void setLootPoolId(String lootPoolId) {
+        this.lootPoolId = (lootPoolId != null && !lootPoolId.trim().isEmpty()) ? lootPoolId.trim().toLowerCase() : null;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    public java.util.List<String> getRecentSelections() {
+        return new java.util.ArrayList<>(recentSelections);
+    }
+
+    public void addRecentSelection(String selectionSummary) {
+        if (selectionSummary == null || selectionSummary.trim().isEmpty()) return;
+        recentSelections.addFirst(selectionSummary.trim());
+        while (recentSelections.size() > 5) {
+            recentSelections.removeLast();
+        }
     }
 
     public boolean isEnabled() {
@@ -145,11 +206,11 @@ public class LootContainer {
         this.updatedAt = System.currentTimeMillis();
     }
 
-    public long getNextRefill() {
+    public Long getNextRefill() {
         return nextRefill;
     }
 
-    public void setNextRefill(long nextRefill) {
+    public void setNextRefill(Long nextRefill) {
         this.nextRefill = nextRefill;
         this.updatedAt = System.currentTimeMillis();
     }

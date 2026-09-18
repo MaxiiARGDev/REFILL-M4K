@@ -76,7 +76,7 @@ public class ContainerMenu extends MenuHolder {
                                 "§7Origen: " + sourceStr,
                                 "§7Estado: " + statusStr,
                                 "§7Administrado: " + managedStr,
-                                "§7Loot Table: §e" + (container.getLootTableId().isEmpty() ? "§7(Sin asignar)" : container.getLootTableId()),
+                                "§7Loot Table: " + (container.hasLootConfigured() ? "§e" + container.getLootTableId() : "§cSin Loot configurado"),
                                 "§7Refill: " + refillStr
                         );
 

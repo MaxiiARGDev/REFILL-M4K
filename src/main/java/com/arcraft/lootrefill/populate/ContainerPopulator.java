@@ -62,14 +62,30 @@ public class ContainerPopulator {
             return PopulateResult.SKIPPED_INVALID;
         }
 
-        // 2. Validación de Loot Table
-        String tableId = container.getLootTableId();
-        if (tableId == null || tableId.trim().isEmpty()) {
-            return PopulateResult.SKIPPED_NO_LOOT_TABLE;
-        }
+        // 2. Validación y resolución de Loot Source (Pool o Tabla legada)
+        com.arcraft.lootrefill.pool.LootPool pool = null;
+        List<LootTable> selectedTables = null;
+        LootTable legacyTable = null;
 
-        LootTable table = plugin.getLootManager().getTable(tableId);
-        if (table == null || !table.isEnabled()) {
+        if (container.getLootPoolId() != null && !container.getLootPoolId().trim().isEmpty()) {
+            pool = plugin.getLootPoolManager().getPool(container.getLootPoolId());
+            if (pool == null || !pool.isEnabled() || !pool.hasEntries()) {
+                plugin.getLogger().warning("[Populate] Loot Pool inexistente, deshabilitado o sin tablas para el contenedor "
+                        + container.getId() + " (Pool: " + container.getLootPoolId() + ")");
+                return PopulateResult.SKIPPED_INVALID_LOOT_POOL;
+            }
+            selectedTables = plugin.getLootPoolManager().selectTables(pool);
+            if (selectedTables.isEmpty()) {
+                plugin.getLogger().warning("[Populate] No se pudieron seleccionar tablas válidas del pool " + pool.getId());
+                return PopulateResult.SKIPPED_INVALID_LOOT_POOL;
+            }
+        } else if (container.getLootTableId() != null && !container.getLootTableId().trim().isEmpty()) {
+            String tableId = container.getLootTableId();
+            legacyTable = plugin.getLootManager().getTable(tableId);
+            if (legacyTable == null || !legacyTable.isEnabled()) {
+                return PopulateResult.SKIPPED_NO_LOOT_TABLE;
+            }
+        } else {
             return PopulateResult.SKIPPED_NO_LOOT_TABLE;
         }
 
@@ -122,20 +138,35 @@ public class ContainerPopulator {
         }
 
         // 6. Generación de loot ponderado mediante LootGenerator
-        List<ItemStack> loot = LootGenerator.generate(table);
+        List<ItemStack> loot = new ArrayList<>();
+        String selectionSummary;
+
+        if (pool != null && selectedTables != null) {
+            List<String> names = new ArrayList<>();
+            for (LootTable t : selectedTables) {
+                loot.addAll(LootGenerator.generate(t));
+                names.add(t.getId().toUpperCase());
+            }
+            selectionSummary = String.join(" + ", names);
+        } else if (legacyTable != null) {
+            loot = LootGenerator.generate(legacyTable);
+            selectionSummary = legacyTable.getId().toUpperCase();
+        } else {
+            return PopulateResult.SKIPPED_INVALID;
+        }
+
         if (loot.isEmpty()) {
             return PopulateResult.SKIPPED_INVALID;
         }
+
+        container.addRecentSelection(selectionSummary);
 
         // 7. Distribución aleatoria en slots disponibles
         distributeLootRandomSlots(inv, loot);
 
         // 8. Actualización de timestamps del contenedor
         long now = System.currentTimeMillis();
-        int interval = container.getRefillIntervalSeconds();
-        if (interval <= 0) {
-            interval = plugin.getRefillManager().getIntervalForType(type);
-        }
+        int interval = plugin.getRefillManager().getIntervalForType(type);
 
         container.setLooted(false);
         container.setLastLoot(now);
@@ -146,7 +177,7 @@ public class ContainerPopulator {
         if (plugin.getConfig().getBoolean("plugin.debug", false)) {
             plugin.getLogger().info("[DEBUG] Populated MAP " + type.name() + " at "
                     + container.getWorld() + " " + container.getX() + " " + container.getY() + " " + container.getZ()
-                    + " with table " + tableId);
+                    + " with loot: " + selectionSummary);
         }
 
         return PopulateResult.POPULATED;

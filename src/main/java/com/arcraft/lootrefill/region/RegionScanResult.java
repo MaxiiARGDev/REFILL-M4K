@@ -11,22 +11,22 @@ public class RegionScanResult {
 
     private final RegionSelection selection;
     private final List<LootContainer> newCandidates;
+    private final List<LootContainer> playerCandidates;
     private final int alreadyMapCount;
-    private final int playerCount;
     private final int brokenCount;
     private final Map<ContainerType, Integer> countersByType;
     private final long scanTimestamp;
 
     public RegionScanResult(RegionSelection selection,
                             List<LootContainer> newCandidates,
+                            List<LootContainer> playerCandidates,
                             int alreadyMapCount,
-                            int playerCount,
                             int brokenCount,
                             Map<ContainerType, Integer> countersByType) {
         this.selection = selection;
         this.newCandidates = newCandidates != null ? Collections.unmodifiableList(newCandidates) : Collections.emptyList();
+        this.playerCandidates = playerCandidates != null ? Collections.unmodifiableList(playerCandidates) : Collections.emptyList();
         this.alreadyMapCount = alreadyMapCount;
-        this.playerCount = playerCount;
         this.brokenCount = brokenCount;
         this.countersByType = countersByType != null ? Collections.unmodifiableMap(countersByType) : Collections.emptyMap();
         this.scanTimestamp = System.currentTimeMillis();
@@ -40,12 +40,16 @@ public class RegionScanResult {
         return newCandidates;
     }
 
+    public List<LootContainer> getPlayerCandidates() {
+        return playerCandidates;
+    }
+
     public int getAlreadyMapCount() {
         return alreadyMapCount;
     }
 
     public int getPlayerCount() {
-        return playerCount;
+        return playerCandidates.size();
     }
 
     public int getBrokenCount() {
@@ -57,7 +61,7 @@ public class RegionScanResult {
     }
 
     public int getTotalContainers() {
-        return newCandidates.size() + alreadyMapCount + playerCount + brokenCount;
+        return newCandidates.size() + alreadyMapCount + playerCandidates.size() + brokenCount;
     }
 
     public long getScanTimestamp() {

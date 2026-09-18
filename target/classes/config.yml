@@ -100,6 +100,48 @@ refill:
       enabled: true
       interval: 3600
 
+# Loot Pools (Etapa 4.2)
+# Nota: SQLite es la fuente principal de almacenamiento. Estos valores sirven de defaults y plantilla.
+loot-pools:
+  house:
+    enabled: true
+    selection:
+      mode: SINGLE_RANDOM
+      rolls:
+        min: 1
+        max: 1
+    tables:
+      common:
+        weight: 40
+      food:
+        weight: 30
+      medical:
+        weight: 20
+      rare:
+        weight: 10
+
+  military:
+    enabled: true
+    selection:
+      mode: MIXED_RANDOM
+      allow-duplicates: false
+      rolls:
+        min: 2
+        max: 4
+    tables:
+      common:
+        weight: 10
+      food:
+        weight: 10
+      medical:
+        weight: 20
+      military:
+        weight: 45
+      high_tier:
+        weight: 10
+      rare:
+        weight: 5
+
 storage:
   type: sqlite
 

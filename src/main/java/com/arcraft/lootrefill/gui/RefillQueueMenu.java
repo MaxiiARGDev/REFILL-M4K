@@ -55,15 +55,15 @@ public class RefillQueueMenu extends MenuHolder {
 
             if (index < endIndex) {
                 LootContainer container = pending.get(index);
-                long timeLeft = Math.max(0, (container.getNextRefill() - now) / 1000L);
+                long timeLeft = container.getNextRefill() != null ? Math.max(0, (container.getNextRefill() - now) / 1000L) : 0L;
 
                 Material mat = container.getContainerType().getMaterial();
                 ItemStack item = new ItemBuilder(mat)
                         .name("§e" + container.getContainerType().name() + " §8(§f" + container.getWorld() + "§8)")
                         .lore(
                                 "§7Coordenadas: §f" + container.getX() + ", " + container.getY() + ", " + container.getZ(),
-                                "§7Tabla de Loot: §a" + container.getLootTableId(),
-                                "§7Tiempo restante: §e" + (timeLeft == 0 ? "¡Listo para refill!" : timeLeft + "s"),
+                                "§7Tabla de Loot: " + (container.hasLootConfigured() ? "§a" + container.getLootTableId() : "§cSin Loot configurado"),
+                                "§7Tiempo restante: §e" + (!container.hasLootConfigured() ? "§cSin Loot" : (timeLeft == 0 ? "¡Listo para refill!" : timeLeft + "s")),
                                 "§7Saqueado: " + (container.isLooted() ? "§cSí" : "§aNo"),
                                 "",
                                 "§aClick Izquierdo: §7Refill ahora",
@@ -74,12 +74,8 @@ public class RefillQueueMenu extends MenuHolder {
 
                 setItem(slot, item, event -> {
                     if (event.isLeftClick()) {
-                        RefillResult res = plugin.getRefillManager().refillContainer(container);
-                        if (res == RefillResult.SUCCESS) {
-                            MessageUtil.sendMessage(player, "&aRefill ejecutado con éxito en el contenedor.");
-                        } else {
-                            MessageUtil.sendMessage(player, "&cNo se pudo rellenar el contenedor: " + res.getDescription());
-                        }
+                        plugin.getRefillManager().refillContainer(container);
+                        MessageUtil.sendMessage(player, "&aRefill ejecutado forzosamente para el contenedor.");
                         initialize(player);
                     } else if (event.isRightClick()) {
                         container.setNextRefill(System.currentTimeMillis() + (container.getRefillIntervalSeconds() * 1000L));
@@ -88,7 +84,7 @@ public class RefillQueueMenu extends MenuHolder {
                         initialize(player);
                     } else if (event.isShiftClick()) {
                         container.setLooted(false);
-                        container.setNextRefill(0);
+                        container.setNextRefill(container.hasLootConfigured() ? 0L : null);
                         plugin.getContainerManager().saveContainer(container);
                         MessageUtil.sendMessage(player, "&bEstado del contenedor reseteado.");
                         initialize(player);

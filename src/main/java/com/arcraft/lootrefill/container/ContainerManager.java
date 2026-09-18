@@ -10,6 +10,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -48,10 +49,17 @@ public class ContainerManager {
                 int z = rs.getInt("z");
                 ContainerType type = ContainerType.fromString(rs.getString("container_type"));
                 String tableId = rs.getString("loot_table_id");
+                if (tableId != null && tableId.trim().isEmpty()) {
+                    tableId = null;
+                }
+                String poolId = rs.getString("loot_pool_id");
+                if (poolId != null && poolId.trim().isEmpty()) {
+                    poolId = null;
+                }
                 boolean enabled = rs.getInt("enabled") == 1;
                 boolean looted = rs.getInt("looted") == 1;
                 long lastLoot = rs.getLong("last_loot");
-                long nextRefill = rs.getLong("next_refill");
+                Long nextRefill = rs.getObject("next_refill") != null ? rs.getLong("next_refill") : null;
                 boolean refillEnabled = rs.getInt("refill_enabled") == 1;
                 int refillInterval = rs.getInt("refill_interval_seconds");
 
@@ -62,7 +70,7 @@ public class ContainerManager {
                 long createdAt = rs.getLong("created_at");
                 long updatedAt = rs.getLong("updated_at");
 
-                LootContainer container = new LootContainer(id, world, x, y, z, type, tableId, enabled, looted, lastLoot, nextRefill, refillEnabled, refillInterval, source, status, managed, registered, createdAt, updatedAt);
+                LootContainer container = new LootContainer(id, world, x, y, z, type, tableId, poolId, enabled, looted, lastLoot, nextRefill, refillEnabled, refillInterval, source, status, managed, registered, createdAt, updatedAt);
                 containersById.put(id, container);
                 containersByKey.put(container.getLocationKey(), container);
             }
@@ -108,11 +116,12 @@ public class ContainerManager {
 
     public void saveContainer(LootContainer container) {
         String sql = """
-            INSERT INTO containers (id, world, x, y, z, container_type, loot_table_id, enabled, looted, last_loot, next_refill, refill_enabled, refill_interval_seconds, source, status, managed, registered, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO containers (id, world, x, y, z, container_type, loot_table_id, loot_pool_id, enabled, looted, last_loot, next_refill, refill_enabled, refill_interval_seconds, source, status, managed, registered, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(world, x, y, z) DO UPDATE SET
                 container_type = excluded.container_type,
                 loot_table_id = excluded.loot_table_id,
+                loot_pool_id = excluded.loot_pool_id,
                 enabled = excluded.enabled,
                 looted = excluded.looted,
                 last_loot = excluded.last_loot,
@@ -142,12 +151,16 @@ public class ContainerManager {
         if (batch == null || batch.isEmpty()) return 0;
 
         String sql = """
-            INSERT INTO containers (id, world, x, y, z, container_type, loot_table_id, enabled, looted, last_loot, next_refill, refill_enabled, refill_interval_seconds, source, status, managed, registered, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO containers (id, world, x, y, z, container_type, loot_table_id, loot_pool_id, enabled, looted, last_loot, next_refill, refill_enabled, refill_interval_seconds, source, status, managed, registered, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(world, x, y, z) DO UPDATE SET
                 container_type = excluded.container_type,
-                loot_table_id = CASE WHEN containers.source = 'PLAYER' THEN '' ELSE excluded.loot_table_id END,
+                loot_table_id = CASE WHEN containers.source = 'PLAYER' THEN NULL ELSE excluded.loot_table_id END,
+                loot_pool_id = CASE WHEN containers.source = 'PLAYER' THEN NULL ELSE excluded.loot_pool_id END,
                 enabled = CASE WHEN containers.status = 'BROKEN' THEN 0 ELSE excluded.enabled END,
+                looted = excluded.looted,
+                last_loot = excluded.last_loot,
+                next_refill = excluded.next_refill,
                 refill_enabled = CASE WHEN containers.source = 'PLAYER' OR containers.status = 'BROKEN' THEN 0 ELSE excluded.refill_enabled END,
                 refill_interval_seconds = excluded.refill_interval_seconds,
                 source = CASE WHEN containers.source = 'PLAYER' THEN 'PLAYER' ELSE excluded.source END,
@@ -198,6 +211,64 @@ public class ContainerManager {
         return count;
     }
 
+    /**
+     * Convierte explícitamente contenedores PLAYER a MAP bajo orden administrativa.
+     * Conserva el inventario intacto, no limpia ítems y no genera loot durante la conversión.
+     */
+    public int convertPlayerContainersToMap(List<LootContainer> containers) {
+        if (containers == null || containers.isEmpty()) return 0;
+
+        String sql = """
+            UPDATE containers SET
+                source = 'MAP',
+                status = 'ACTIVE',
+                managed = 1,
+                registered = 1,
+                loot_table_id = NULL,
+                loot_pool_id = NULL,
+                next_refill = NULL,
+                updated_at = ?
+            WHERE id = ?
+        """;
+
+        int count = 0;
+        long now = System.currentTimeMillis();
+
+        try (Connection conn = databaseManager.getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                for (LootContainer c : containers) {
+                    c.setSource(ContainerSource.MAP);
+                    c.setStatus(ContainerStatus.ACTIVE);
+                    c.setManaged(true);
+                    c.setRegistered(true);
+                    c.setLootTableId(null);
+                    c.setLootPoolId(null);
+                    c.setNextRefill(null);
+                    c.setUpdatedAt(now);
+
+                    stmt.setLong(1, now);
+                    stmt.setString(2, c.getId().toString());
+                    stmt.addBatch();
+                    count++;
+
+                    containersById.put(c.getId(), c);
+                    containersByKey.put(c.getLocationKey(), c);
+                }
+                stmt.executeBatch();
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al convertir contenedores PLAYER a MAP", e);
+        }
+        return count;
+    }
+
     private void bindContainerStatement(PreparedStatement stmt, LootContainer container) throws SQLException {
         stmt.setString(1, container.getId().toString());
         stmt.setString(2, container.getWorld());
@@ -205,19 +276,32 @@ public class ContainerManager {
         stmt.setInt(4, container.getY());
         stmt.setInt(5, container.getZ());
         stmt.setString(6, container.getContainerType().name());
-        stmt.setString(7, container.getLootTableId());
-        stmt.setInt(8, container.isEnabled() ? 1 : 0);
-        stmt.setInt(9, container.isLooted() ? 1 : 0);
-        stmt.setLong(10, container.getLastLoot());
-        stmt.setLong(11, container.getNextRefill());
-        stmt.setInt(12, container.isRefillEnabled() ? 1 : 0);
-        stmt.setInt(13, container.getRefillIntervalSeconds());
-        stmt.setString(14, container.getSource().name());
-        stmt.setString(15, container.getStatus().name());
-        stmt.setInt(16, container.isManaged() ? 1 : 0);
-        stmt.setInt(17, container.isRegistered() ? 1 : 0);
-        stmt.setLong(18, container.getCreatedAt());
-        stmt.setLong(19, container.getUpdatedAt());
+        if (container.getLootTableId() == null || container.getLootTableId().trim().isEmpty()) {
+            stmt.setNull(7, java.sql.Types.VARCHAR);
+        } else {
+            stmt.setString(7, container.getLootTableId());
+        }
+        if (container.getLootPoolId() == null || container.getLootPoolId().trim().isEmpty()) {
+            stmt.setNull(8, java.sql.Types.VARCHAR);
+        } else {
+            stmt.setString(8, container.getLootPoolId());
+        }
+        stmt.setInt(9, container.isEnabled() ? 1 : 0);
+        stmt.setInt(10, container.isLooted() ? 1 : 0);
+        stmt.setLong(11, container.getLastLoot());
+        if (container.getNextRefill() == null) {
+            stmt.setNull(12, java.sql.Types.BIGINT);
+        } else {
+            stmt.setLong(12, container.getNextRefill());
+        }
+        stmt.setInt(13, container.isRefillEnabled() ? 1 : 0);
+        stmt.setInt(14, container.getRefillIntervalSeconds());
+        stmt.setString(15, container.getSource().name());
+        stmt.setString(16, container.getStatus().name());
+        stmt.setInt(17, container.isManaged() ? 1 : 0);
+        stmt.setInt(18, container.isRegistered() ? 1 : 0);
+        stmt.setLong(19, container.getCreatedAt());
+        stmt.setLong(20, container.getUpdatedAt());
     }
 
     private void deleteContainerFromDb(UUID id) {
@@ -343,8 +427,7 @@ public class ContainerManager {
             AND managed = 1
             AND registered = 1
             AND refill_enabled = 1
-            AND loot_table_id IS NOT NULL
-            AND loot_table_id != ''
+            AND ((loot_table_id IS NOT NULL AND loot_table_id != '') OR (loot_pool_id IS NOT NULL AND loot_pool_id != ''))
             AND next_refill IS NOT NULL
             AND next_refill <= ?
             ORDER BY next_refill ASC
@@ -380,8 +463,7 @@ public class ContainerManager {
             AND managed = 1
             AND registered = 1
             AND refill_enabled = 1
-            AND loot_table_id IS NOT NULL
-            AND loot_table_id != ''
+            AND ((loot_table_id IS NOT NULL AND loot_table_id != '') OR (loot_pool_id IS NOT NULL AND loot_pool_id != ''))
             AND next_refill IS NOT NULL
             AND next_refill <= ?
         """;
@@ -395,5 +477,36 @@ public class ContainerManager {
             plugin.getLogger().log(Level.WARNING, "Error contando contenedores vencidos para refill", e);
         }
         return 0;
+    }
+
+    /**
+     * Obtiene el desglose de estadísticas de contenedores (MAP, PLAYER, BROKEN, Total) para un mundo específico.
+     */
+    public ContainerWorldStats getContainerStatsByWorld(String worldName) {
+        return databaseManager.getContainerStatsByWorld(worldName);
+    }
+
+    /**
+     * Elimina exclusivamente los contenedores del mundo indicado en SQLite y limpia la memoria.
+     */
+    public int resetContainersByWorld(String worldName) {
+        int count = databaseManager.resetContainersByWorld(worldName);
+
+        // Limpiar de la memoria únicamente los contenedores de ese mundo
+        List<UUID> toRemove = new ArrayList<>();
+        for (LootContainer c : containersById.values()) {
+            if (c.getWorld().equalsIgnoreCase(worldName)) {
+                toRemove.add(c.getId());
+            }
+        }
+
+        for (UUID id : toRemove) {
+            LootContainer c = containersById.remove(id);
+            if (c != null) {
+                containersByKey.remove(c.getLocationKey());
+            }
+        }
+
+        return count;
     }
 }

@@ -94,6 +94,27 @@ public class RefillManager {
         processedDoubleChests.clear();
     }
 
+    /**
+     * Limpia completamente las colas en memoria y listas de cooldown / doble cofres.
+     */
+    public void clearRefillState() {
+        if (refillQueue != null) {
+            refillQueue.clear();
+        }
+        retryCooldowns.clear();
+        processedDoubleChests.clear();
+    }
+
+    /**
+     * Invalida y remueve de las colas de refill y estados en memoria los contenedores pertenecientes al mundo indicado.
+     */
+    public void clearRefillStateForWorld(String worldName) {
+        if (refillQueue != null) {
+            refillQueue.removeContainersForWorld(worldName);
+        }
+        processedDoubleChests.removeIf(key -> key.toLowerCase().startsWith(worldName.toLowerCase() + ":"));
+    }
+
     public void pause() {
         this.paused = true;
     }
@@ -179,15 +200,33 @@ public class RefillManager {
             return RefillResult.SKIPPED_DISABLED;
         }
 
-        // 2. Validación de Loot Table
-        String tableId = container.getLootTableId();
-        if (tableId == null || tableId.trim().isEmpty()) {
-            stats.recordResult(RefillResult.SKIPPED_NO_LOOT_TABLE);
-            return RefillResult.SKIPPED_NO_LOOT_TABLE;
-        }
+        // 2. Validación y resolución de Loot Source (Pool o Tabla legada)
+        com.arcraft.lootrefill.pool.LootPool pool = null;
+        List<LootTable> selectedTables = null;
+        LootTable legacyTable = null;
 
-        LootTable table = lootManager.getTable(tableId);
-        if (table == null || !table.isEnabled()) {
+        if (container.getLootPoolId() != null && !container.getLootPoolId().trim().isEmpty()) {
+            pool = plugin.getLootPoolManager().getPool(container.getLootPoolId());
+            if (pool == null || !pool.isEnabled() || !pool.hasEntries()) {
+                stats.recordResult(RefillResult.SKIPPED_INVALID_LOOT_POOL);
+                plugin.getLogger().warning("[Refill] Loot Pool inexistente, deshabilitado o sin tablas para el contenedor "
+                        + container.getId() + " (Pool: " + container.getLootPoolId() + ")");
+                return RefillResult.SKIPPED_INVALID_LOOT_POOL;
+            }
+            selectedTables = plugin.getLootPoolManager().selectTables(pool);
+            if (selectedTables.isEmpty()) {
+                stats.recordResult(RefillResult.SKIPPED_INVALID_LOOT_POOL);
+                plugin.getLogger().warning("[Refill] No se pudieron seleccionar tablas válidas del pool " + pool.getId());
+                return RefillResult.SKIPPED_INVALID_LOOT_POOL;
+            }
+        } else if (container.getLootTableId() != null && !container.getLootTableId().trim().isEmpty()) {
+            String tableId = container.getLootTableId();
+            legacyTable = lootManager.getTable(tableId);
+            if (legacyTable == null || !legacyTable.isEnabled()) {
+                stats.recordResult(RefillResult.SKIPPED_NO_LOOT_TABLE);
+                return RefillResult.SKIPPED_NO_LOOT_TABLE;
+            }
+        } else {
             stats.recordResult(RefillResult.SKIPPED_NO_LOOT_TABLE);
             return RefillResult.SKIPPED_NO_LOOT_TABLE;
         }
@@ -281,12 +320,32 @@ public class RefillManager {
         }
 
         // 7. Generación de loot mediante LootGenerator
-        List<ItemStack> lootItems = LootGenerator.generate(table);
+        List<ItemStack> lootItems = new ArrayList<>();
+        String selectionSummary;
+
+        if (pool != null && selectedTables != null) {
+            List<String> names = new ArrayList<>();
+            for (LootTable t : selectedTables) {
+                lootItems.addAll(LootGenerator.generate(t));
+                names.add(t.getId().toUpperCase());
+            }
+            selectionSummary = String.join(" + ", names);
+        } else if (legacyTable != null) {
+            lootItems = LootGenerator.generate(legacyTable);
+            selectionSummary = legacyTable.getId().toUpperCase();
+        } else {
+            stats.recordResult(RefillResult.ERROR);
+            logDebug(container, loc, RefillResult.ERROR);
+            return RefillResult.ERROR;
+        }
+
         if (lootItems.isEmpty()) {
             stats.recordResult(RefillResult.ERROR);
             logDebug(container, loc, RefillResult.ERROR);
             return RefillResult.ERROR;
         }
+
+        container.addRecentSelection(selectionSummary);
 
         // 8. Distribución en slots aleatorios
         distributeLootRandomly(inv, lootItems);
@@ -326,11 +385,13 @@ public class RefillManager {
         return true;
     }
 
+    public int getEffectiveIntervalForContainer(LootContainer container) {
+        if (container == null) return 1800;
+        return getIntervalForType(container.getContainerType());
+    }
+
     private int getIntervalForContainer(LootContainer container, ContainerType type) {
-        int interval = container.getRefillIntervalSeconds();
-        if (interval <= 0) {
-            interval = getIntervalForType(type);
-        }
+        int interval = getIntervalForType(type);
         return Math.max(10, interval);
     }
 

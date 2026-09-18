@@ -89,6 +89,17 @@ public class RegionManager {
         return lastScanResults.get(playerId);
     }
 
+    public void clearAllScanResults() {
+        lastScanResults.clear();
+    }
+
+    public void clearScanResultsForWorld(String worldName) {
+        lastScanResults.entrySet().removeIf(entry -> {
+            var res = entry.getValue();
+            return res != null && res.getSelection() != null && res.getSelection().getWorld() != null && res.getSelection().getWorld().getName().equalsIgnoreCase(worldName);
+        });
+    }
+
     public void giveWand(Player player) {
         ItemStack wand = createWandItem();
         player.getInventory().addItem(wand);

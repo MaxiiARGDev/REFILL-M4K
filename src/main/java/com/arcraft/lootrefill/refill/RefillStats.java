@@ -37,7 +37,7 @@ public class RefillStats {
             case SKIPPED_INVALID_BLOCK -> skippedInvalidBlock.increment();
             case SKIPPED_TYPE_MISMATCH -> skippedTypeMismatch.increment();
             case SKIPPED_DISABLED -> skippedDisabled.increment();
-            case SKIPPED_NO_LOOT_TABLE -> skippedNoLootTable.increment();
+            case SKIPPED_NO_LOOT_TABLE, SKIPPED_INVALID_LOOT_POOL -> skippedNoLootTable.increment();
             case SKIPPED_BURNING -> skippedBurning.increment();
             case SKIPPED_DOUBLE_CHEST_PAIR -> skippedDoubleChestPair.increment();
             case ERROR -> errors.increment();

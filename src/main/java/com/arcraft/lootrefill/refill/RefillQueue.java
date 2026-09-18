@@ -187,6 +187,19 @@ public class RefillQueue {
         currentlyLoadingChunks.set(0);
     }
 
+    public void clear() {
+        for (Deque<LootContainer> q : queuesByType.values()) {
+            q.clear();
+        }
+        currentlyLoadingChunks.set(0);
+    }
+
+    public void removeContainersForWorld(String worldName) {
+        for (Deque<LootContainer> q : queuesByType.values()) {
+            q.removeIf(c -> c.getWorld().equalsIgnoreCase(worldName));
+        }
+    }
+
     public void pollAllDueContainers() {
         for (ContainerType type : ROUND_ROBIN_TYPES) {
             queuesByType.get(type).clear();
@@ -219,5 +232,17 @@ public class RefillQueue {
             total += q.size();
         }
         return total;
+    }
+
+    public boolean isTaskRunning() {
+        return queueTask != null && !queueTask.isCancelled();
+    }
+
+    public int getTaskId() {
+        return queueTask != null ? queueTask.getTaskId() : -1;
+    }
+
+    public int getLoadingChunksCount() {
+        return currentlyLoadingChunks.get();
     }
 }

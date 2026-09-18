@@ -1,6 +1,7 @@
 package com.arcraft.lootrefill.storage;
 
 import com.arcraft.lootrefill.LootRefillPlugin;
+import com.arcraft.lootrefill.container.ContainerWorldStats;
 import com.arcraft.lootrefill.scanner.ScanJob;
 
 import java.io.File;
@@ -67,7 +68,34 @@ public class DatabaseManager {
                 );
             """);
 
-            // Tabla containers con campos completos de Etapa 2.1
+            // Tabla loot_pools (Etapa 4.2)
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS loot_pools (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    selection_mode TEXT NOT NULL DEFAULT 'SINGLE_RANDOM',
+                    min_rolls INTEGER NOT NULL DEFAULT 1,
+                    max_rolls INTEGER NOT NULL DEFAULT 1,
+                    allow_duplicates INTEGER NOT NULL DEFAULT 0,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    created_at INTEGER NOT NULL DEFAULT 0,
+                    updated_at INTEGER NOT NULL DEFAULT 0
+                );
+            """);
+
+            // Tabla loot_pool_entries (Etapa 4.2)
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS loot_pool_entries (
+                    id TEXT PRIMARY KEY,
+                    pool_id TEXT NOT NULL,
+                    table_id TEXT NOT NULL,
+                    weight INTEGER NOT NULL DEFAULT 10,
+                    FOREIGN KEY(pool_id) REFERENCES loot_pools(id) ON DELETE CASCADE,
+                    FOREIGN KEY(table_id) REFERENCES loot_tables(id) ON DELETE CASCADE
+                );
+            """);
+
+            // Tabla containers con campos completos de Etapa 2.1 y Etapa 4.2
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS containers (
                     id TEXT PRIMARY KEY,
@@ -77,10 +105,11 @@ public class DatabaseManager {
                     z INTEGER NOT NULL,
                     container_type TEXT NOT NULL,
                     loot_table_id TEXT,
+                    loot_pool_id TEXT,
                     enabled INTEGER NOT NULL,
                     looted INTEGER NOT NULL,
                     last_loot INTEGER NOT NULL,
-                    next_refill INTEGER NOT NULL,
+                    next_refill INTEGER,
                     refill_enabled INTEGER NOT NULL DEFAULT 1,
                     refill_interval_seconds INTEGER NOT NULL DEFAULT 1800,
                     source TEXT NOT NULL DEFAULT 'MAP',
@@ -94,6 +123,7 @@ public class DatabaseManager {
 
             // Migración automática de columnas para bases de datos existentes
             migrateContainersTable(conn);
+            migrateLootPoolsTable(conn);
 
             // Índices espaciales y de rendimiento requeridos
             stmt.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_containers_loc ON containers(world, x, y, z);");
@@ -102,6 +132,7 @@ public class DatabaseManager {
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_type ON containers(container_type);");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_next_refill ON containers(next_refill);");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_loot_table ON containers(loot_table_id);");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_loot_pool ON containers(loot_pool_id);");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_source_status ON containers(source, status, managed);");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_refill_eligible ON containers(container_type, source, status, managed, refill_enabled, next_refill);");
 
@@ -154,6 +185,8 @@ public class DatabaseManager {
             boolean hasRegistered = false;
             boolean hasCreatedAt = false;
             boolean hasUpdatedAt = false;
+            boolean hasLootPoolId = false;
+            boolean nextRefillNotNull = false;
 
             while (rs.next()) {
                 String col = rs.getString("name");
@@ -165,6 +198,8 @@ public class DatabaseManager {
                 if ("registered".equalsIgnoreCase(col)) hasRegistered = true;
                 if ("created_at".equalsIgnoreCase(col)) hasCreatedAt = true;
                 if ("updated_at".equalsIgnoreCase(col)) hasUpdatedAt = true;
+                if ("loot_pool_id".equalsIgnoreCase(col)) hasLootPoolId = true;
+                if ("next_refill".equalsIgnoreCase(col) && rs.getInt("notnull") == 1) nextRefillNotNull = true;
             }
 
             if (!hasRefillEnabled) {
@@ -191,8 +226,76 @@ public class DatabaseManager {
             if (!hasUpdatedAt) {
                 stmt.execute("ALTER TABLE containers ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;");
             }
+            if (!hasLootPoolId) {
+                stmt.execute("ALTER TABLE containers ADD COLUMN loot_pool_id TEXT;");
+            }
+
+            // Migrar next_refill si tiene restricción NOT NULL
+            if (nextRefillNotNull) {
+                stmt.execute("PRAGMA foreign_keys = OFF;");
+                stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS containers_temp (
+                        id TEXT PRIMARY KEY,
+                        world TEXT NOT NULL,
+                        x INTEGER NOT NULL,
+                        y INTEGER NOT NULL,
+                        z INTEGER NOT NULL,
+                        container_type TEXT NOT NULL,
+                        loot_table_id TEXT,
+                        loot_pool_id TEXT,
+                        enabled INTEGER NOT NULL,
+                        looted INTEGER NOT NULL,
+                        last_loot INTEGER NOT NULL,
+                        next_refill INTEGER,
+                        refill_enabled INTEGER NOT NULL DEFAULT 1,
+                        refill_interval_seconds INTEGER NOT NULL DEFAULT 1800,
+                        source TEXT NOT NULL DEFAULT 'MAP',
+                        status TEXT NOT NULL DEFAULT 'ACTIVE',
+                        managed INTEGER NOT NULL DEFAULT 1,
+                        registered INTEGER NOT NULL DEFAULT 1,
+                        created_at INTEGER NOT NULL DEFAULT 0,
+                        updated_at INTEGER NOT NULL DEFAULT 0
+                    );
+                """);
+                stmt.execute("INSERT OR REPLACE INTO containers_temp SELECT * FROM containers;");
+                stmt.execute("DROP TABLE containers;");
+                stmt.execute("ALTER TABLE containers_temp RENAME TO containers;");
+                stmt.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_containers_loc ON containers(world, x, y, z);");
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_world ON containers(world);");
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_world_xz ON containers(world, x, z);");
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_type ON containers(container_type);");
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_next_refill ON containers(next_refill);");
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_loot_table ON containers(loot_table_id);");
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_loot_pool ON containers(loot_pool_id);");
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_source_status ON containers(source, status, managed);");
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_containers_refill_eligible ON containers(container_type, source, status, managed, refill_enabled, next_refill);");
+                stmt.execute("PRAGMA foreign_keys = ON;");
+            }
+
+            // Normalizar cadenas vacías a NULL en loot_table_id y loot_pool_id
+            stmt.execute("UPDATE containers SET loot_table_id = NULL WHERE loot_table_id = '';");
+            stmt.execute("UPDATE containers SET loot_pool_id = NULL WHERE loot_pool_id = '';");
         } catch (SQLException e) {
             plugin.getLogger().log(Level.WARNING, "Error al verificar migración de columnas en containers", e);
+        }
+    }
+
+    private void migrateLootPoolsTable(Connection conn) {
+        try (Statement stmt = conn.createStatement()) {
+            ResultSet rs = stmt.executeQuery("PRAGMA table_info(loot_pools);");
+            boolean hasAllowDuplicates = false;
+            while (rs.next()) {
+                String col = rs.getString("name");
+                if ("allow_duplicates".equalsIgnoreCase(col)) {
+                    hasAllowDuplicates = true;
+                    break;
+                }
+            }
+            if (!hasAllowDuplicates) {
+                stmt.execute("ALTER TABLE loot_pools ADD COLUMN allow_duplicates INTEGER NOT NULL DEFAULT 0;");
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.WARNING, "Error al verificar migración de columnas en loot_pools", e);
         }
     }
 
@@ -340,6 +443,51 @@ public class DatabaseManager {
             plugin.getLogger().log(Level.WARNING, "Error al cargar último populate_job global", e);
         }
         return null;
+    }
+
+    /**
+     * Obtiene el desglose de estadísticas de contenedores (MAP, PLAYER, BROKEN, Total) para un mundo específico.
+     */
+    public ContainerWorldStats getContainerStatsByWorld(String worldName) {
+        int map = 0;
+        int player = 0;
+        int broken = 0;
+        int total = 0;
+        String sql = "SELECT source, status, COUNT(*) FROM containers WHERE LOWER(world) = LOWER(?) GROUP BY source, status";
+        try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, worldName);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                String source = rs.getString(1);
+                String status = rs.getString(2);
+                int count = rs.getInt(3);
+                total += count;
+                if ("BROKEN".equalsIgnoreCase(status)) {
+                    broken += count;
+                } else if ("PLAYER".equalsIgnoreCase(source)) {
+                    player += count;
+                } else if ("MAP".equalsIgnoreCase(source)) {
+                    map += count;
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.WARNING, "Error consultando estadísticas de contenedores para mundo: " + worldName, e);
+        }
+        return new ContainerWorldStats(map, player, broken, total);
+    }
+
+    /**
+     * Elimina exclusivamente los registros de la tabla containers cuyo world corresponda al mundo indicado.
+     */
+    public int resetContainersByWorld(String worldName) {
+        String sql = "DELETE FROM containers WHERE LOWER(world) = LOWER(?)";
+        try (Connection conn = getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, worldName);
+            return stmt.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al reiniciar contenedores del mundo " + worldName, e);
+        }
+        return 0;
     }
 
     public Connection getConnection() throws SQLException {

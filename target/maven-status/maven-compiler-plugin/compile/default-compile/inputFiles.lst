@@ -5,6 +5,7 @@ C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\co
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\container\ContainerSource.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\container\ContainerStatus.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\container\ContainerType.java
+C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\container\ContainerWorldStats.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\container\LootContainer.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\gui\AdminMenu.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\gui\ChatInputHandler.java
@@ -25,6 +26,11 @@ C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\lo
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\loot\LootTable.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\loot\LootTableStorage.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\LootRefillPlugin.java
+C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\pool\LootPool.java
+C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\pool\LootPoolEntry.java
+C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\pool\LootPoolManager.java
+C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\pool\LootPoolStorage.java
+C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\pool\PoolSelectionMode.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\populate\ContainerPopulator.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\populate\PopulateJob.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\populate\PopulateManager.java

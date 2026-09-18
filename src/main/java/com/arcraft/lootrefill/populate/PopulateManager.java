@@ -248,4 +248,79 @@ public class PopulateManager {
         MessageUtil.sendMessage(sender, "&aAsignación completada exitosamente.");
         MessageUtil.sendMessage(sender, "&7Se asignó la tabla &e" + lootTableId.toUpperCase() + " &7a &a" + toUpdate.size() + " &7contenedores de tipo &f" + type.name() + " &7en &e" + worldName + "&7.");
     }
+
+    /**
+     * Asignación controlada de Loot Pools por tipo de contenedor en un mundo (/loot assign-pool).
+     */
+    public void assignLootPool(World world, ContainerType type, String lootPoolId, boolean force, boolean preview, CommandSender sender) {
+        if (world == null) {
+            MessageUtil.sendMessage(sender, "&cEl mundo especificado no existe.");
+            return;
+        }
+
+        if (!plugin.getLootPoolManager().poolExists(lootPoolId)) {
+            MessageUtil.sendMessage(sender, "&cEl Loot Pool '&e" + lootPoolId + "&c' no existe. Pools disponibles: &f"
+                    + String.join(", ", plugin.getLootPoolManager().getPoolIds()));
+            return;
+        }
+
+        String worldName = world.getName();
+        int foundMap = 0;
+        int alreadyAssigned = 0;
+        List<LootContainer> toUpdate = new ArrayList<>();
+
+        for (LootContainer c : containerManager.getAllContainers()) {
+            if (c.getWorld().equalsIgnoreCase(worldName)
+                    && c.getContainerType() == type
+                    && c.getSource() == ContainerSource.MAP
+                    && c.getStatus() == ContainerStatus.ACTIVE
+                    && c.isManaged()) {
+
+                foundMap++;
+
+                boolean hasPoolOrTable = (c.getLootPoolId() != null && !c.getLootPoolId().trim().isEmpty())
+                        || (c.getLootTableId() != null && !c.getLootTableId().trim().isEmpty());
+
+                if (hasPoolOrTable && !force) {
+                    alreadyAssigned++;
+                    continue;
+                }
+
+                toUpdate.add(c);
+            }
+        }
+
+        if (preview) {
+            MessageUtil.sendRaw(sender, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            MessageUtil.sendRaw(sender, "&6&lLootRefill » Vista Previa de Asignación de Pool");
+            MessageUtil.sendRaw(sender, "&7Mundo: &e" + worldName);
+            MessageUtil.sendRaw(sender, "&7Tipo: &f" + type.name());
+            MessageUtil.sendRaw(sender, "&7Loot Pool objetivo: &e" + lootPoolId.toUpperCase());
+            MessageUtil.sendRaw(sender, "");
+            MessageUtil.sendRaw(sender, "&7Contenedores MAP encontrados: &f" + foundMap);
+            MessageUtil.sendRaw(sender, "&aElegibles para asignación: &e" + toUpdate.size());
+            MessageUtil.sendRaw(sender, "&7Ya tenían botín asignado: &f" + alreadyAssigned + (force ? " &c(Serán sobreescritos por --force)" : " &7(Se conservarán)"));
+            MessageUtil.sendRaw(sender, "");
+            MessageUtil.sendRaw(sender, "&aNo se realizaron cambios. &7(Modo Preview)");
+            MessageUtil.sendRaw(sender, "&7Para confirmar ejecuta:");
+            MessageUtil.sendRaw(sender, "&e/loot assign-pool " + worldName + " " + type.name().toLowerCase() + " " + lootPoolId + (force ? " --force" : "") + " confirm");
+            MessageUtil.sendRaw(sender, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            return;
+        }
+
+        // Ejecución real de la asignación
+        long now = System.currentTimeMillis();
+        for (LootContainer c : toUpdate) {
+            c.setLootPoolId(lootPoolId);
+            c.setManaged(true);
+            c.setRefillEnabled(true);
+            c.setNextRefill(now);
+            c.setUpdatedAt(now);
+        }
+
+        containerManager.saveContainersBatch(toUpdate);
+
+        MessageUtil.sendMessage(sender, "&aAsignación de Loot Pool completada exitosamente.");
+        MessageUtil.sendMessage(sender, "&7Se asignó el pool &e" + lootPoolId.toUpperCase() + " &7a &a" + toUpdate.size() + " &7contenedores de tipo &f" + type.name() + " &7en &e" + worldName + "&7.");
+    }
 }

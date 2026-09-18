@@ -9,6 +9,7 @@ public enum RefillResult {
     SKIPPED_TYPE_MISMATCH("§cOmitido: El tipo de bloque físico no coincide con el registrado"),
     SKIPPED_DISABLED("§8Omitido: Contenedor o tipo deshabilitado"),
     SKIPPED_NO_LOOT_TABLE("§cOmitido: Sin tabla de loot asignada o válida"),
+    SKIPPED_INVALID_LOOT_POOL("§cOmitido: Loot Pool inválido, deshabilitado o vacío"),
     SKIPPED_BURNING("§6Omitido: Horno en uso o fundiendo"),
     SKIPPED_DOUBLE_CHEST_PAIR("§7Omitido: Doble cofre ya rellenado en este ciclo"),
     ERROR("§4Error durante el proceso de refill");
