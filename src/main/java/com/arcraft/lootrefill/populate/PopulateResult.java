@@ -1,0 +1,14 @@
+package com.arcraft.lootrefill.populate;
+
+public enum PopulateResult {
+    POPULATED,
+    SKIPPED_NOT_EMPTY,
+    SKIPPED_NO_LOOT_TABLE,
+    SKIPPED_PLAYER,
+    SKIPPED_BROKEN,
+    SKIPPED_DISABLED,
+    SKIPPED_INVALID,
+    SKIPPED_UNSUPPORTED_TYPE,
+    SKIPPED_DOUBLE_CHEST_ALREADY_POPULATED,
+    ERROR
+}

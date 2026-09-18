@@ -1,0 +1,115 @@
+plugin:
+  debug: false
+
+scanner:
+  enabled: true
+  chunks-per-tick: 1
+  max-ms-per-tick: 3
+  pause-between-batches: 1
+  save-every: 100
+
+containers:
+  chest:
+    enabled: true
+  trapped-chest:
+    enabled: true
+  barrel:
+    enabled: true
+  furnace:
+    enabled: true
+  blast-furnace:
+    enabled: true
+  smoker:
+    enabled: true
+  dispenser:
+    enabled: true
+  dropper:
+    enabled: true
+
+populate:
+  enabled: true
+  require-empty: true
+
+  processing:
+    containers-per-tick: 5
+    max-ms-per-tick: 2
+    batch-delay-ticks: 1
+
+  container-types:
+    chest:
+      enabled: true
+    trapped-chest:
+      enabled: true
+    barrel:
+      enabled: true
+    furnace:
+      enabled: false
+    blast-furnace:
+      enabled: false
+    smoker:
+      enabled: false
+    dispenser:
+      enabled: true
+    dropper:
+      enabled: true
+
+refill:
+  enabled: true
+
+  processing:
+    containers-per-tick: 5
+    max-ms-per-tick: 2
+    batch-delay-ticks: 1
+    max-refills-per-cycle: 0
+
+  conditions:
+    require-empty: true
+    require-no-players-nearby: true
+    nearby-radius: 32.0
+    refill-loaded-chunks-only: false
+    max-chunks-loaded-by-refill: 1
+
+  chunks:
+    unload-after-refill: true
+    only-load-needed-chunks: true
+
+  # Intervalos por tipo de contenedor (en segundos)
+  intervals:
+    chest:
+      enabled: true
+      interval: 1800
+    trapped-chest:
+      enabled: true
+      interval: 1800
+    barrel:
+      enabled: true
+      interval: 3600
+    furnace:
+      enabled: false
+      interval: 7200
+    blast-furnace:
+      enabled: false
+      interval: 7200
+    smoker:
+      enabled: false
+      interval: 7200
+    dispenser:
+      enabled: true
+      interval: 3600
+    dropper:
+      enabled: true
+      interval: 3600
+
+storage:
+  type: sqlite
+
+messages:
+  prefix: "&6&lLootRefill &8» "
+  no-permission: "&cNo tienes permisos para ejecutar este comando."
+  reload-success: "&a¡Configuración y datos recargados correctamente!"
+  table-created: "&aTabla de loot &e%table% &acreada con éxito."
+  table-deleted: "&cTabla de loot &e%table% &celiminada."
+  table-saved: "&aCambios guardados en la tabla de loot &e%table%&a."
+  refill-manual-triggered: "&aSe ha ejecutado el refill manual para &e%count% &acontenedores."
+  chat-input-prompt: "&eEscribe el nuevo valor en el chat o escribe &ccancel &epara cancelar:"
+  chat-input-cancelled: "&cOperación cancelada."

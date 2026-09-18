@@ -1,0 +1,15 @@
+name: LootRefill
+version: '1.0.0'
+main: com.arcraft.lootrefill.LootRefillPlugin
+api-version: '1.21'
+author: Arcraft
+description: Sistema modular de administracion y refill automatico de contenedores.
+commands:
+  loot:
+    description: Comando principal de administracion de LootRefill.
+    permission: lootrefill.admin
+    usage: /loot [admin|reload|scan|refill|help]
+permissions:
+  lootrefill.admin:
+    description: Permite utilizar todos los comandos y acceder a los paneles de LootRefill.
+    default: op
