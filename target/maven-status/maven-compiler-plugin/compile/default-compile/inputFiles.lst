@@ -36,6 +36,11 @@ C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\re
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\refill\RefillResult.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\refill\RefillStats.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\refill\RefillTask.java
+C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\region\RegionManager.java
+C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\region\RegionScanner.java
+C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\region\RegionScanResult.java
+C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\region\RegionSelection.java
+C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\region\RegionWandListener.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\scanner\RegionFileScanner.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\scanner\ScanJob.java
 C:\Users\rataatrevida\Desktop\REFILL-M4K\src\main\java\com\arcraft\lootrefill\scanner\WorldScanner.java

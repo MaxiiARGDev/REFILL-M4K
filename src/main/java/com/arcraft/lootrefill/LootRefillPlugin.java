@@ -29,6 +29,8 @@ public final class LootRefillPlugin extends JavaPlugin {
     private WorldScanner worldScanner;
     private PopulateManager populateManager;
     private GuiManager guiManager;
+    private com.arcraft.lootrefill.region.RegionManager regionManager;
+    private com.arcraft.lootrefill.region.RegionScanner regionScanner;
 
     @Override
     public void onEnable() {
@@ -61,18 +63,23 @@ public final class LootRefillPlugin extends JavaPlugin {
         // 6. Inicializar Populate Manager (Etapa 3)
         this.populateManager = new PopulateManager(this, containerManager);
 
-        // 7. Inicializar sistema de GUIs, capturas de chat y listeners de bloques
+        // 7. Inicializar Region Wand & Scanner (Etapa 4.1)
+        this.regionManager = new com.arcraft.lootrefill.region.RegionManager(this);
+        this.regionScanner = new com.arcraft.lootrefill.region.RegionScanner(this, containerManager, regionManager);
+
+        // 8. Inicializar sistema de GUIs, capturas de chat y listeners de bloques
         this.guiManager = new GuiManager(this);
         Bukkit.getPluginManager().registerEvents(guiManager, this);
         Bukkit.getPluginManager().registerEvents(guiManager.getChatInputHandler(), this);
         Bukkit.getPluginManager().registerEvents(new com.arcraft.lootrefill.container.ContainerBlockListener(this, containerManager, containerRegistry), this);
+        Bukkit.getPluginManager().registerEvents(new com.arcraft.lootrefill.region.RegionWandListener(this, regionManager), this);
 
-        // 8. Registrar comandos
+        // 9. Registrar comandos
         LootCommand lootCommand = new LootCommand(this);
         Objects.requireNonNull(getCommand("loot")).setExecutor(lootCommand);
         Objects.requireNonNull(getCommand("loot")).setTabCompleter(lootCommand);
 
-        // 8. Detección de scans previos incompletos tras reinicio
+        // 10. Detección de scans previos incompletos tras reinicio
         ScanJob incompleteJob = databaseManager.loadIncompleteScanJob();
         if (incompleteJob != null) {
             getLogger().warning("==========================================================");
@@ -155,5 +162,13 @@ public final class LootRefillPlugin extends JavaPlugin {
 
     public GuiManager getGuiManager() {
         return guiManager;
+    }
+
+    public com.arcraft.lootrefill.region.RegionManager getRegionManager() {
+        return regionManager;
+    }
+
+    public com.arcraft.lootrefill.region.RegionScanner getRegionScanner() {
+        return regionScanner;
     }
 }

@@ -33,21 +33,23 @@ public class RegionManager {
     }
 
     public ItemStack createWandItem() {
-        ItemStack wand = new ItemStack(Material.BLAZE_ROD);
+        ItemStack wand = new com.arcraft.lootrefill.util.ItemBuilder(Material.BLAZE_ROD)
+                .name("&6&lLootRefill Wand &7(Etapa 4.1)")
+                .lore(
+                        "&7Herramienta administrativa de selección de región.",
+                        "&8• &eClick Izquierdo: &fEstablece Punto A",
+                        "&8• &eClick Derecho: &fEstablece Punto B",
+                        "",
+                        "&7Comandos disponibles:",
+                        "  &8» &e/loot region info",
+                        "  &8» &e/loot region scan",
+                        "  &8» &e/loot region assign",
+                        "  &8» &e/loot region clear"
+                )
+                .build();
+
         ItemMeta meta = wand.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(MessageUtil.color("&6&lLootRefill Wand &7(Etapa 4.1)"));
-            meta.setLore(Arrays.asList(
-                    MessageUtil.color("&7Herramienta administrativa de selección de región."),
-                    MessageUtil.color("&8• &eClick Izquierdo: &fEstablece Punto A"),
-                    MessageUtil.color("&8• &eClick Derecho: &fEstablece Punto B"),
-                    MessageUtil.color(""),
-                    MessageUtil.color("&7Comandos disponibles:"),
-                    MessageUtil.color("  &8» &e/loot region info"),
-                    MessageUtil.color("  &8» &e/loot region scan"),
-                    MessageUtil.color("  &8» &e/loot region assign"),
-                    MessageUtil.color("  &8» &e/loot region clear")
-            ));
             meta.getPersistentDataContainer().set(wandKey, PersistentDataType.BYTE, (byte) 1);
             wand.setItemMeta(meta);
         }

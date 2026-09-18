@@ -1,6 +1,7 @@
 com\arcraft\lootrefill\populate\PopulateManager.class
 com\arcraft\lootrefill\refill\RefillQueue$1.class
 com\arcraft\lootrefill\gui\AdminMenu.class
+com\arcraft\lootrefill\region\RegionScanner$1.class
 com\arcraft\lootrefill\gui\LootTypesMenu.class
 com\arcraft\lootrefill\populate\PopulateQueue$1.class
 com\arcraft\lootrefill\scanner\ScanJob.class
@@ -9,6 +10,7 @@ com\arcraft\lootrefill\gui\RefillQueueMenu.class
 com\arcraft\lootrefill\populate\PopulateStats.class
 com\arcraft\lootrefill\gui\LootAddItemMenu.class
 com\arcraft\lootrefill\util\GuiItem.class
+com\arcraft\lootrefill\region\RegionManager.class
 com\arcraft\lootrefill\populate\PopulateQueue.class
 com\arcraft\lootrefill\refill\RefillManager.class
 com\arcraft\lootrefill\gui\RefillConfigMenu.class
@@ -29,6 +31,7 @@ com\arcraft\lootrefill\gui\ScannerMenu.class
 com\arcraft\lootrefill\populate\PopulateJob$Status.class
 com\arcraft\lootrefill\refill\RefillTask.class
 com\arcraft\lootrefill\container\ContainerStatus.class
+com\arcraft\lootrefill\region\RegionSelection.class
 com\arcraft\lootrefill\scanner\WorldScanner$1.class
 com\arcraft\lootrefill\LootRefillPlugin.class
 com\arcraft\lootrefill\container\LootContainer.class
@@ -38,15 +41,18 @@ com\arcraft\lootrefill\container\ContainerBlockListener.class
 com\arcraft\lootrefill\scanner\WorldScanner.class
 com\arcraft\lootrefill\scanner\ScanJob$Status.class
 com\arcraft\lootrefill\loot\LootManager.class
+com\arcraft\lootrefill\region\RegionScanner.class
 com\arcraft\lootrefill\loot\LootGenerator.class
 com\arcraft\lootrefill\scanner\RegionFileScanner.class
 com\arcraft\lootrefill\gui\LootEditorMenu.class
 com\arcraft\lootrefill\refill\RefillResult.class
+com\arcraft\lootrefill\region\RegionScanResult.class
 com\arcraft\lootrefill\refill\RefillStats.class
 com\arcraft\lootrefill\refill\RefillStats$1.class
 com\arcraft\lootrefill\gui\MenuHolder.class
 com\arcraft\lootrefill\gui\PopulateMenu.class
 com\arcraft\lootrefill\populate\PopulateStats$1.class
+com\arcraft\lootrefill\region\RegionWandListener.class
 com\arcraft\lootrefill\gui\ChatInputHandler.class
 com\arcraft\lootrefill\container\ContainerRegistry.class
 com\arcraft\lootrefill\container\ContainerSource.class

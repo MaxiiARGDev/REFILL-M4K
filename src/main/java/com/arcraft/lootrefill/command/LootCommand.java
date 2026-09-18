@@ -84,6 +84,14 @@ public class LootCommand implements CommandExecutor, TabCompleter {
                     MessageUtil.sendMessage(player, "&cNo se pudo registrar el contenedor.");
                 }
             }
+            case "wand" -> {
+                if (!(sender instanceof Player player)) {
+                    MessageUtil.sendMessage(sender, "&cEste comando solo puede ser ejecutado por un jugador.");
+                    return true;
+                }
+                plugin.getRegionManager().giveWand(player);
+            }
+            case "region" -> handleRegionCommand(sender, args);
             case "help" -> sendHelp(sender);
             default -> {
                 MessageUtil.sendMessage(sender, "&cSubcomando desconocido. Escribe &e/loot help &cpara ver la lista de comandos.");
@@ -270,10 +278,82 @@ public class LootCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handleRegionCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            MessageUtil.sendMessage(sender, "&cEste comando solo puede ser ejecutado por un jugador.");
+            return;
+        }
+
+        if (args.length < 2) {
+            MessageUtil.sendMessage(player, "&cUso: &e/loot region <info|clear|scan|assign>");
+            return;
+        }
+
+        String action = args[1].toLowerCase();
+        switch (action) {
+            case "info" -> {
+                var selection = plugin.getRegionManager().getSelectionOrNull(player.getUniqueId());
+                if (selection == null || (!selection.isComplete() && selection.getPointA() == null && selection.getPointB() == null)) {
+                    MessageUtil.sendMessage(player, "&eNo tienes ningún punto seleccionado actualmente.");
+                    MessageUtil.sendMessage(player, "&7Usa &e/loot wand &7para obtener la varita y seleccionar los Puntos A y B.");
+                    return;
+                }
+
+                MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+                MessageUtil.sendRaw(player, "&6&lLootRefill » Información de Región Seleccionada");
+                if (selection.getPointA() != null) {
+                    var a = selection.getPointA();
+                    MessageUtil.sendRaw(player, "&7Punto A: &a" + a.getBlockX() + ", " + a.getBlockY() + ", " + a.getBlockZ() + " &8(" + a.getWorld().getName() + ")");
+                } else {
+                    MessageUtil.sendRaw(player, "&7Punto A: &cNo establecido");
+                }
+
+                if (selection.getPointB() != null) {
+                    var b = selection.getPointB();
+                    MessageUtil.sendRaw(player, "&7Punto B: &a" + b.getBlockX() + ", " + b.getBlockY() + ", " + b.getBlockZ() + " &8(" + b.getWorld().getName() + ")");
+                } else {
+                    MessageUtil.sendRaw(player, "&7Punto B: &cNo establecido");
+                }
+
+                if (selection.isComplete()) {
+                    MessageUtil.sendRaw(player, "");
+                    MessageUtil.sendRaw(player, "&7Mundo: &e" + selection.getWorld().getName());
+                    MessageUtil.sendRaw(player, "&7Límites: &f(" + selection.getMinX() + ", " + selection.getMinY() + ", " + selection.getMinZ() + ") &7a &f(" + selection.getMaxX() + ", " + selection.getMaxY() + ", " + selection.getMaxZ() + ")");
+                    MessageUtil.sendRaw(player, "&7Dimensiones: &e" + selection.getWidthX() + " &7x &e" + selection.getHeightY() + " &7x &e" + selection.getLengthZ());
+                    MessageUtil.sendRaw(player, "&7Volumen: &f" + selection.getVolume() + " &7bloques");
+                    MessageUtil.sendRaw(player, "&7Chunks intersecantes: &b" + selection.getTotalChunks());
+                    MessageUtil.sendRaw(player, "");
+                    MessageUtil.sendRaw(player, "&7Usa &e/loot region scan &7para escanear contenedores en la región.");
+                } else {
+                    MessageUtil.sendRaw(player, "&cSelección incompleta. Debes definir ambos puntos con la varita.");
+                }
+                MessageUtil.sendRaw(player, "&6&m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            }
+            case "clear" -> {
+                plugin.getRegionManager().clearSelection(player.getUniqueId());
+                MessageUtil.sendMessage(player, "&aSelección de región limpiada correctamente.");
+            }
+            case "scan" -> {
+                plugin.getRegionScanner().startScan(player);
+            }
+            case "assign" -> {
+                plugin.getRegionScanner().handleAssignCommand(player, args);
+            }
+            default -> {
+                MessageUtil.sendMessage(player, "&cAcción desconocida '&e" + args[1] + "&c'. Usa: &einfo, clear, scan, assign&c.");
+            }
+        }
+    }
+
     private void sendHelp(CommandSender sender) {
         MessageUtil.sendRaw(sender, "&6&m----------------------------------------");
         MessageUtil.sendRaw(sender, "&6&lLootRefill &7- Comandos Administrativos");
         MessageUtil.sendRaw(sender, "&e/loot admin &7- Abre el menú principal de administración");
+        MessageUtil.sendRaw(sender, "&e/loot wand &7- Entrega la varita para selección de regiones (A/B)");
+        MessageUtil.sendRaw(sender, "&e/loot region info &7- Muestra información de la región seleccionada");
+        MessageUtil.sendRaw(sender, "&e/loot region clear &7- Limpia la selección actual de región");
+        MessageUtil.sendRaw(sender, "&e/loot region scan &7- Escanea contenedores en la región seleccionada");
+        MessageUtil.sendRaw(sender, "&e/loot region assign [confirm] &7- Vista previa y registro de contenedores como MAP");
         MessageUtil.sendRaw(sender, "&e/loot reload &7- Recarga configuraciones y tablas");
         MessageUtil.sendRaw(sender, "&e/loot scan <mundo> &7- Inicia el escaneo del mundo indicado");
         MessageUtil.sendRaw(sender, "&e/loot scan [status|pause|resume|cancel] &7- Control del escáner");
@@ -293,10 +373,23 @@ public class LootCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 1) {
-            List<String> subs = Arrays.asList("admin", "reload", "scan", "populate", "assign", "refill", "register", "help");
+            List<String> subs = Arrays.asList("admin", "wand", "region", "reload", "scan", "populate", "assign", "refill", "register", "help");
             return subs.stream()
                     .filter(s -> s.toLowerCase().startsWith(args[0].toLowerCase()))
                     .toList();
+        }
+
+        if (args[0].equalsIgnoreCase("region")) {
+            if (args.length == 2) {
+                return List.of("info", "clear", "scan", "assign").stream()
+                        .filter(s -> s.toLowerCase().startsWith(args[1].toLowerCase()))
+                        .toList();
+            }
+            if (args.length == 3 && args[1].equalsIgnoreCase("assign")) {
+                return List.of("confirm").stream()
+                        .filter(s -> s.toLowerCase().startsWith(args[2].toLowerCase()))
+                        .toList();
+            }
         }
 
         if (args[0].equalsIgnoreCase("refill")) {
