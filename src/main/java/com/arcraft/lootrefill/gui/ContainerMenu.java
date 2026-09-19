@@ -69,6 +69,13 @@ public class ContainerMenu extends MenuHolder {
                 String managedStr = container.isManaged() ? "§aSÍ" : "§cNO";
                 String refillStr = container.isRefillEnabled() ? "§aACTIVADO" : "§cDESACTIVADO";
 
+                String lootDesc = "§cSin Loot configurado";
+                if (container.hasLootConfigured()) {
+                    lootDesc = container.getLootPoolId() != null
+                            ? "§d[Pool] " + container.getLootPoolId()
+                            : "§e" + container.getLootTableId();
+                }
+
                 ItemBuilder builder = new ItemBuilder(icon)
                         .name("§6" + container.getContainerType().name() + " §8(§f" + container.getWorld() + "§8)")
                         .addLore(
@@ -76,7 +83,7 @@ public class ContainerMenu extends MenuHolder {
                                 "§7Origen: " + sourceStr,
                                 "§7Estado: " + statusStr,
                                 "§7Administrado: " + managedStr,
-                                "§7Loot Table: " + (container.hasLootConfigured() ? "§e" + container.getLootTableId() : "§cSin Loot configurado"),
+                                "§7Loot: " + lootDesc,
                                 "§7Refill: " + refillStr
                         );
 

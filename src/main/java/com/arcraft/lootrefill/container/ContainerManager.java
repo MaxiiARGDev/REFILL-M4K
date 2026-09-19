@@ -157,15 +157,15 @@ public class ContainerManager {
                 container_type = excluded.container_type,
                 loot_table_id = CASE WHEN containers.source = 'PLAYER' THEN NULL ELSE excluded.loot_table_id END,
                 loot_pool_id = CASE WHEN containers.source = 'PLAYER' THEN NULL ELSE excluded.loot_pool_id END,
-                enabled = CASE WHEN containers.status = 'BROKEN' THEN 0 ELSE excluded.enabled END,
+                enabled = CASE WHEN containers.status IN ('BROKEN', 'DISABLED') THEN 0 ELSE excluded.enabled END,
                 looted = excluded.looted,
                 last_loot = excluded.last_loot,
                 next_refill = excluded.next_refill,
-                refill_enabled = CASE WHEN containers.source = 'PLAYER' OR containers.status = 'BROKEN' THEN 0 ELSE excluded.refill_enabled END,
+                refill_enabled = CASE WHEN containers.source = 'PLAYER' OR containers.status IN ('BROKEN', 'DISABLED') THEN 0 ELSE excluded.refill_enabled END,
                 refill_interval_seconds = excluded.refill_interval_seconds,
                 source = CASE WHEN containers.source = 'PLAYER' THEN 'PLAYER' ELSE excluded.source END,
-                status = CASE WHEN containers.status = 'BROKEN' THEN 'BROKEN' ELSE excluded.status END,
-                managed = CASE WHEN containers.source = 'PLAYER' OR containers.status = 'BROKEN' THEN 0 ELSE excluded.managed END,
+                status = CASE WHEN containers.status IN ('BROKEN', 'DISABLED') THEN containers.status ELSE excluded.status END,
+                managed = CASE WHEN containers.source = 'PLAYER' OR containers.status IN ('BROKEN', 'DISABLED') THEN 0 ELSE excluded.managed END,
                 registered = CASE WHEN containers.source = 'PLAYER' THEN 0 ELSE excluded.registered END,
                 updated_at = excluded.updated_at;
         """;
@@ -179,7 +179,7 @@ public class ContainerManager {
                     stmt.addBatch();
                     count++;
 
-                    // Preservar en memoria si ya era PLAYER o BROKEN
+                    // Preservar en memoria si ya era PLAYER, BROKEN o DISABLED
                     LootContainer existing = containersByKey.get(container.getLocationKey());
                     if (existing != null) {
                         if (existing.getSource() == ContainerSource.PLAYER) {
@@ -189,6 +189,11 @@ public class ContainerManager {
                         }
                         if (existing.getStatus() == ContainerStatus.BROKEN) {
                             container.setStatus(ContainerStatus.BROKEN);
+                            container.setManaged(false);
+                            container.setRefillEnabled(false);
+                        }
+                        if (existing.getStatus() == ContainerStatus.DISABLED) {
+                            container.setStatus(ContainerStatus.DISABLED);
                             container.setManaged(false);
                             container.setRefillEnabled(false);
                         }

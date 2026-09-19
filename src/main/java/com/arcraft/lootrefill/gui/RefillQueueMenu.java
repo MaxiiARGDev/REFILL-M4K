@@ -57,12 +57,19 @@ public class RefillQueueMenu extends MenuHolder {
                 LootContainer container = pending.get(index);
                 long timeLeft = container.getNextRefill() != null ? Math.max(0, (container.getNextRefill() - now) / 1000L) : 0L;
 
+                String lootDesc = "§cSin Loot configurado";
+                if (container.hasLootConfigured()) {
+                    lootDesc = container.getLootPoolId() != null
+                            ? "§d[Pool] " + container.getLootPoolId()
+                            : "§a" + container.getLootTableId();
+                }
+
                 Material mat = container.getContainerType().getMaterial();
                 ItemStack item = new ItemBuilder(mat)
                         .name("§e" + container.getContainerType().name() + " §8(§f" + container.getWorld() + "§8)")
                         .lore(
                                 "§7Coordenadas: §f" + container.getX() + ", " + container.getY() + ", " + container.getZ(),
-                                "§7Tabla de Loot: " + (container.hasLootConfigured() ? "§a" + container.getLootTableId() : "§cSin Loot configurado"),
+                                "§7Configuración de Loot: " + lootDesc,
                                 "§7Tiempo restante: §e" + (!container.hasLootConfigured() ? "§cSin Loot" : (timeLeft == 0 ? "¡Listo para refill!" : timeLeft + "s")),
                                 "§7Saqueado: " + (container.isLooted() ? "§cSí" : "§aNo"),
                                 "",
@@ -78,7 +85,8 @@ public class RefillQueueMenu extends MenuHolder {
                         MessageUtil.sendMessage(player, "&aRefill ejecutado forzosamente para el contenedor.");
                         initialize(player);
                     } else if (event.isRightClick()) {
-                        container.setNextRefill(System.currentTimeMillis() + (container.getRefillIntervalSeconds() * 1000L));
+                        int effectiveInterval = plugin.getRefillManager().getEffectiveIntervalForContainer(container);
+                        container.setNextRefill(System.currentTimeMillis() + (effectiveInterval * 1000L));
                         plugin.getContainerManager().saveContainer(container);
                         MessageUtil.sendMessage(player, "&eRefill pospuesto para el contenedor.");
                         initialize(player);

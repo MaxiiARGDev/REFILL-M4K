@@ -77,7 +77,7 @@ public class PopulateMenu extends MenuHolder {
                 continue;
             }
 
-            if (c.getLootTableId() == null || c.getLootTableId().trim().isEmpty()) {
+            if (!c.hasLootConfigured()) {
                 withoutTable++;
             } else {
                 eligible++;

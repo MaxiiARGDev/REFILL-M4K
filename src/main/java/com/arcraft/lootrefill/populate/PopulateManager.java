@@ -87,15 +87,18 @@ public class PopulateManager {
                 continue;
             }
 
-            String tableId = c.getLootTableId();
-            if (tableId == null || tableId.trim().isEmpty()) {
+            boolean hasPool = c.getLootPoolId() != null && !c.getLootPoolId().trim().isEmpty();
+            boolean hasTable = c.getLootTableId() != null && !c.getLootTableId().trim().isEmpty();
+
+            if (!hasPool && !hasTable) {
                 skippedNoTable++;
                 continue;
             }
 
             eligible++;
             typeCounts.merge(c.getContainerType(), 1, Integer::sum);
-            tableCounts.merge(tableId.toUpperCase(), 1, Integer::sum);
+            String lootSource = hasPool ? "POOL: " + c.getLootPoolId().toUpperCase() : c.getLootTableId().toUpperCase();
+            tableCounts.merge(lootSource, 1, Integer::sum);
         }
 
         int totalSkipped = skippedNoTable + skippedUnsupported + skippedBroken;
@@ -106,7 +109,7 @@ public class PopulateManager {
         MessageUtil.sendRaw(sender, "&7Contenedores MAP totales: &f" + mapContainers);
         MessageUtil.sendRaw(sender, "&aElegibles para Populate: &e" + eligible);
         MessageUtil.sendRaw(sender, "&cSaltados / Inelegibles: &f" + totalSkipped);
-        if (skippedNoTable > 0) MessageUtil.sendRaw(sender, "  &8• &7Sin tabla asignada: &e" + skippedNoTable);
+        if (skippedNoTable > 0) MessageUtil.sendRaw(sender, "  &8• &7Sin tabla ni pool asignado: &e" + skippedNoTable);
         if (skippedUnsupported > 0) MessageUtil.sendRaw(sender, "  &8• &7Tipo no soportado (Hornos, etc.): &e" + skippedUnsupported);
         if (skippedBroken > 0) MessageUtil.sendRaw(sender, "  &8• &7Bloque roto (BROKEN): &e" + skippedBroken);
         MessageUtil.sendRaw(sender, "");
@@ -114,7 +117,7 @@ public class PopulateManager {
         for (Map.Entry<ContainerType, Integer> entry : typeCounts.entrySet()) {
             MessageUtil.sendRaw(sender, "  &8• &f" + entry.getKey().name() + ": &a" + entry.getValue());
         }
-        MessageUtil.sendRaw(sender, "&7Distribución por Loot Table:");
+        MessageUtil.sendRaw(sender, "&7Distribución por Loot (Pool o Tabla):");
         for (Map.Entry<String, Integer> entry : tableCounts.entrySet()) {
             MessageUtil.sendRaw(sender, "  &8• &f" + entry.getKey() + ": &e" + entry.getValue());
         }
@@ -148,8 +151,7 @@ public class PopulateManager {
                     && c.getStatus() == ContainerStatus.ACTIVE
                     && c.isManaged()
                     && c.isRegistered()
-                    && c.getLootTableId() != null
-                    && !c.getLootTableId().trim().isEmpty()) {
+                    && c.hasLootConfigured()) {
 
                 boolean typeEnabled = plugin.getConfig().getBoolean("populate.container-types." + c.getContainerType().getConfigKey() + ".enabled", true);
                 if (typeEnabled) {
@@ -159,8 +161,8 @@ public class PopulateManager {
         }
 
         if (candidates.isEmpty()) {
-            MessageUtil.sendMessage(sender, "&cNo se encontraron contenedores MAP elegibles con tabla asignada en &e" + worldName + "&c.");
-            MessageUtil.sendMessage(sender, "&7Usa &e/loot assign " + worldName + " <tipo> <tabla> &7para asignar tablas primero.");
+            MessageUtil.sendMessage(sender, "&cNo se encontraron contenedores MAP elegibles con botín asignado en &e" + worldName + "&c.");
+            MessageUtil.sendMessage(sender, "&7Usa &e/loot assign " + worldName + " <tipo> <tabla> &7o &e/loot assign-pool &7para asignar botín primero.");
             return;
         }
 

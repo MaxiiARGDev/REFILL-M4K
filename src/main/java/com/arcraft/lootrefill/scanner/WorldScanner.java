@@ -196,10 +196,12 @@ public class WorldScanner {
                         inspectChunk(chunk, world);
                     } else {
                         world.getChunkAtAsync(coord.x(), coord.z(), false).thenAccept(chunk -> {
-                            if (chunk != null) {
-                                inspectChunk(chunk, world);
-                                world.unloadChunkRequest(coord.x(), coord.z());
-                            }
+                            Bukkit.getScheduler().runTask(plugin, () -> {
+                                if (chunk != null) {
+                                    inspectChunk(chunk, world);
+                                    world.unloadChunkRequest(coord.x(), coord.z());
+                                }
+                            });
                         });
                     }
 
@@ -247,9 +249,9 @@ public class WorldScanner {
             Location loc = new Location(world, state.getX(), state.getY(), state.getZ());
             LootContainer existing = containerManager.getContainer(loc);
 
-            // Regla Etapa 2.1: Nunca convertir PLAYER en MAP ni recuperar contenedores BROKEN
+            // Regla Etapa 2.1 & Invariantes: Nunca convertir PLAYER en MAP, ni recuperar BROKEN o DISABLED
             if (existing != null) {
-                if (existing.getSource() == ContainerSource.PLAYER || existing.getStatus() == ContainerStatus.BROKEN) {
+                if (existing.getSource() == ContainerSource.PLAYER || existing.getStatus() == ContainerStatus.BROKEN || existing.getStatus() == ContainerStatus.DISABLED) {
                     continue;
                 }
             }
@@ -265,16 +267,17 @@ public class WorldScanner {
                     state.getZ(),
                     type,
                     existing != null ? existing.getLootTableId() : null,
-                    true,
-                    false,
+                    existing != null ? existing.getLootPoolId() : null,
+                    existing != null ? existing.isEnabled() : true,
+                    existing != null ? existing.isLooted() : false,
                     existing != null ? existing.getLastLoot() : 0L,
                     existing != null && existing.hasLootConfigured() ? existing.getNextRefill() : null,
-                    refillEnabled,
-                    interval,
-                    ContainerSource.MAP,
-                    ContainerStatus.ACTIVE,
-                    true,
-                    true,
+                    existing != null ? existing.isRefillEnabled() : refillEnabled,
+                    existing != null ? existing.getRefillIntervalSeconds() : interval,
+                    existing != null ? existing.getSource() : ContainerSource.MAP,
+                    existing != null ? existing.getStatus() : ContainerStatus.ACTIVE,
+                    existing != null ? existing.isManaged() : true,
+                    existing != null ? existing.isRegistered() : true,
                     existing != null ? existing.getCreatedAt() : now,
                     now
             );

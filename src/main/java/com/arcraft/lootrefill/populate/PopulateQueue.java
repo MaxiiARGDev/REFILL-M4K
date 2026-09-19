@@ -116,13 +116,18 @@ public class PopulateQueue {
         } else {
             // Carga controlada asíncrona sin generar chunks artificiales
             world.getChunkAtAsync(chunkX, chunkZ, false).thenAccept(chunk -> {
-                if (chunk != null) {
-                    PopulateResult result = populator.populate(container);
-                    stats.addResult(result);
-                    world.unloadChunkRequest(chunkX, chunkZ);
-                } else {
-                    stats.addResult(PopulateResult.SKIPPED_INVALID);
-                }
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (chunk != null && chunk.isLoaded()) {
+                        PopulateResult result = populator.populate(container);
+                        stats.addResult(result);
+                        world.unloadChunkRequest(chunkX, chunkZ);
+                    } else {
+                        stats.addResult(PopulateResult.SKIPPED_INVALID);
+                    }
+                });
+            }).exceptionally(ex -> {
+                stats.addResult(PopulateResult.SKIPPED_INVALID);
+                return null;
             });
         }
     }
