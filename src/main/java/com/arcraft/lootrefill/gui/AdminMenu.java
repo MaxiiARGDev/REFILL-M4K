@@ -44,6 +44,20 @@ public class AdminMenu extends MenuHolder {
                 .build();
         setItem(20, lootTypesItem, event -> new LootTypesMenu(plugin, this).open(player));
 
+        // 1.5 Loot Pools (Etapa 4.2 / Container Manager 2.0)
+        int poolsCount = plugin.getLootPoolManager() != null ? plugin.getLootPoolManager().getAllPools().size() : 0;
+        ItemStack lootPoolsItem = new ItemBuilder(Material.ENDER_CHEST)
+                .name("§dLoot Pools")
+                .lore(
+                        "§7Administrá grupos dinámicos y",
+                        "§7selección aleatoria de tablas de loot.",
+                        "§7Pools registrados: §f" + poolsCount,
+                        "",
+                        "§d» Haz clic para abrir"
+                )
+                .build();
+        setItem(21, lootPoolsItem, event -> new LootPoolsMenu(plugin, this).open(player));
+
         // 2. Containers
         ItemStack containersItem = new ItemBuilder(Material.BARREL)
                 .name("§eContenedores")

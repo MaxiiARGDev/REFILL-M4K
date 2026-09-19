@@ -331,6 +331,10 @@ public class ContainerManager {
         return plugin.getConfig().getBoolean("containers." + type.getConfigKey() + ".enabled", true);
     }
 
+    public int getTotalContainers() {
+        return containersById.size();
+    }
+
     public int getCountByType(ContainerType type) {
         int count = 0;
         for (LootContainer c : containersById.values()) {
@@ -512,6 +516,75 @@ public class ContainerManager {
             }
         }
 
+        return count;
+    }
+
+    /**
+     * Consulta contenedores aplicando los criterios de {@link ContainerFilter} y ordenamiento en memoria.
+     * Esta estrategia es óptima para volúmenes estándar de servidor (< 15,000 contenedores) al no generar I/O de disco.
+     *
+     * @param filter criterios de filtrado y ordenamiento (no nulo)
+     * @param page número de página (0-indexed)
+     * @param pageSize cantidad de resultados por página (> 0)
+     * @return lista paginada de contenedores que cumplen con el filtro
+     */
+    public List<LootContainer> findContainers(ContainerFilter filter, int page, int pageSize) {
+        if (filter == null) {
+            filter = ContainerFilter.empty();
+        }
+        int safePage = Math.max(0, page);
+        int safePageSize = Math.max(1, pageSize);
+
+        final ContainerFilter activeFilter = filter;
+        java.util.Comparator<LootContainer> comp = activeFilter.getSortField().getComparator();
+        if (!activeFilter.isAscending()) {
+            comp = comp.reversed();
+        }
+
+        return containersById.values().stream()
+                .filter(activeFilter::test)
+                .sorted(comp)
+                .skip((long) safePage * safePageSize)
+                .limit(safePageSize)
+                .toList();
+    }
+
+    /**
+     * Cuenta el total de contenedores que cumplen con el filtro especificado.
+     *
+     * @param filter criterios de filtrado (no nulo)
+     * @return cantidad total de coincidencias
+     */
+    public int countContainers(ContainerFilter filter) {
+        if (filter == null) {
+            filter = ContainerFilter.empty();
+        }
+        final ContainerFilter activeFilter = filter;
+        return (int) containersById.values().stream()
+                .filter(activeFilter::test)
+                .count();
+    }
+
+    /**
+     * Desvincula en memoria el Loot Pool indicado de todos los contenedores que lo utilizaban.
+     * Preserva exactamente todos los demás campos (loot_table_id, source, status, managed, registered, refill_enabled, next_refill).
+     *
+     * @param poolId ID del pool desvinculado
+     * @return cantidad de contenedores desvinculados en memoria
+     */
+    public int clearPoolFromContainersInMemory(String poolId) {
+        if (poolId == null || poolId.trim().isEmpty()) return 0;
+        String normalized = poolId.trim().toLowerCase();
+        int count = 0;
+        long now = System.currentTimeMillis();
+
+        for (LootContainer c : containersById.values()) {
+            if (c.getLootPoolId() != null && c.getLootPoolId().equalsIgnoreCase(normalized)) {
+                c.setLootPoolId(null);
+                c.setUpdatedAt(now);
+                count++;
+            }
+        }
         return count;
     }
 }

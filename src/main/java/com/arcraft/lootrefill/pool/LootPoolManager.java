@@ -113,10 +113,67 @@ public class LootPoolManager {
         storage.savePool(pool);
     }
 
-    public void deletePool(String id) {
-        if (id == null) return;
-        pools.remove(id.toLowerCase().trim());
-        storage.deletePool(id.toLowerCase().trim());
+    /**
+     * Cuenta cuántos contenedores registrados utilizan este pool.
+     */
+    public int getContainerCountUsingPool(String id) {
+        if (id == null) return 0;
+        return storage.countContainersUsingPool(id.toLowerCase().trim());
+    }
+
+    /**
+     * Elimina el Loot Pool desvinculando de forma segura y transaccional todos los contenedores que lo referencian.
+     * Actualiza simultáneamente el estado en SQLite y en la caché de memoria de {@link com.arcraft.lootrefill.container.ContainerManager}.
+     *
+     * @param id ID del pool a eliminar
+     * @return cantidad de contenedores desvinculados, o -1 si el pool no existía
+     */
+    public int deletePool(String id) {
+        if (id == null || !poolExists(id)) {
+            return -1;
+        }
+        String normalizedId = id.toLowerCase().trim();
+
+        // 1. Eliminar de la base de datos y desvincular containers atómicamente
+        int unlinkedDb = storage.deletePoolAndUnlink(normalizedId);
+
+        // 2. Limpiar de la memoria de LootPoolManager
+        pools.remove(normalizedId);
+
+        // 3. Limpiar referencias en memoria de ContainerManager
+        if (plugin.getContainerManager() != null) {
+            plugin.getContainerManager().clearPoolFromContainersInMemory(normalizedId);
+        }
+
+        return Math.max(0, unlinkedDb);
+    }
+
+    /**
+     * Desvincula el Loot Pool de todos los contenedores sin eliminar la definición del Pool.
+     *
+     * @param id ID del pool a desvincular
+     * @return cantidad de contenedores desvinculados
+     */
+    public int clearPoolFromContainers(String id) {
+        if (id == null) return 0;
+        String normalizedId = id.toLowerCase().trim();
+
+        int unlinked = 0;
+        String unlinkSql = "UPDATE containers SET loot_pool_id = NULL, updated_at = ? WHERE loot_pool_id = ?";
+        try (java.sql.Connection conn = plugin.getDatabaseManager().getConnection();
+             java.sql.PreparedStatement stmt = conn.prepareStatement(unlinkSql)) {
+            stmt.setLong(1, System.currentTimeMillis());
+            stmt.setString(2, normalizedId);
+            unlinked = stmt.executeUpdate();
+        } catch (java.sql.SQLException e) {
+            plugin.getLogger().log(java.util.logging.Level.SEVERE, "Error al desvincular contenedores del pool: " + id, e);
+        }
+
+        if (plugin.getContainerManager() != null) {
+            plugin.getContainerManager().clearPoolFromContainersInMemory(normalizedId);
+        }
+
+        return unlinked;
     }
 
     public Collection<LootPool> getAllPools() {

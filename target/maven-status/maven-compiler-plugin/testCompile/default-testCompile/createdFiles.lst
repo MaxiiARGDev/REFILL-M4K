@@ -1,0 +1,4 @@
+com\arcraft\lootrefill\gui\ConfirmationLogicTest.class
+com\arcraft\lootrefill\pool\LootPoolModelTest.class
+com\arcraft\lootrefill\container\ContainerFilterTest.class
+com\arcraft\lootrefill\gui\ContainerDetailLogicTest.class

@@ -91,6 +91,17 @@ Handles two-point region selection and region operations.
 ### GUI
 Provides administrative interfaces without bypassing business rules.
 
+Key components:
+- `MenuHolder`: Base abstract class for menus with click cancelling, borders and close event handling.
+- `GuiManager`: Enforces `lootrefill.admin` permission, cancels drags, double-clicks, and invalid slot clicks.
+- `ChatInputHandler`: Captures asynchronous chat input safely returning to the main thread.
+- `AdminMenu`: Main administrative dashboard.
+- `ContainerMenu`: Container Manager 2.0 main paginated listing with search, sorting, active filter indicator and quick actions.
+- `ContainerFilterMenu`: Visual interactive configuration for all 12 `ContainerFilter` criteria with pool/table sub-selectors.
+- `ContainerDetailMenu`: Full technical inspector and management card for individual containers.
+- `LootPoolsMenu`, `LootPoolEditorMenu`, `LootPoolMembersMenu`: Dynamic Loot Pool management suite.
+- `ConfirmationMenu`: Reusable modal for critical administrative confirmations (`PLAYER → MAP`, container unregister, pool deletion, table removal) with anti-spam idempotency.
+
 ### Storage
 SQLite persists:
 - `loot_tables`
@@ -277,6 +288,12 @@ Stage 4.1.1   PLAYER → MAP conversion            ✓
 FIX 4.4.1     Interval + next_refill persistence ✓
 Stage 4.2     Loot Pools                         ✓
 MIXED_RANDOM  no-replacement correction          ✓
+CM 2.0 F1     Backend Filtering, Search & Paging ✓
+CM 2.0 F2     Loot Pool Manager GUI Suite        ✓
+CM 2.0 F3     ConfirmationMenu Modal & Safety    ✓
+CM 2.0 F4     Container Manager 2.0 Main GUI     ✓
+CM 2.0 F5     Container Detail Inspector Menu    ✓
+CM 2.0 F6     Final Audit & Documentation Close  ✓
 ```
 
 These are established functionality and must be preserved.

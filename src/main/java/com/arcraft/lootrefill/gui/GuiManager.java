@@ -99,4 +99,17 @@ public class GuiManager implements Listener {
             }
         }
     }
+
+    @EventHandler
+    public void onInventoryClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+        Inventory topInventory = event.getView().getTopInventory();
+        if (topInventory.getHolder() instanceof MenuHolder holder) {
+            try {
+                holder.handleClose(event);
+            } catch (Exception e) {
+                plugin.getLogger().severe("Error al procesar cierre en GUI: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
 }

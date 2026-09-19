@@ -114,6 +114,14 @@ public abstract class MenuHolder implements InventoryHolder {
         return false; // Por seguridad, por defecto nadie puede alterar su inventario dentro de la GUI
     }
 
+    /**
+     * Llamado cuando el inventario es cerrado por el jugador (ESC o evento close).
+     * Por defecto no realiza ninguna acción.
+     */
+    public void handleClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+        // Implementación opcional para subclases
+    }
+
     @Override
     public Inventory getInventory() {
         return inventory;

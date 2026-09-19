@@ -143,19 +143,74 @@ public class LootPoolStorage {
         }
     }
 
-    public void deletePool(String poolId) {
-        if (poolId == null) return;
-        try (Connection conn = databaseManager.getConnection()) {
-            try (PreparedStatement stmt = conn.prepareStatement("DELETE FROM loot_pools WHERE id = ?")) {
-                stmt.setString(1, poolId.toLowerCase());
-                stmt.executeUpdate();
-            }
-            try (PreparedStatement stmt = conn.prepareStatement("DELETE FROM loot_pool_entries WHERE pool_id = ?")) {
-                stmt.setString(1, poolId.toLowerCase());
-                stmt.executeUpdate();
+    /**
+     * Cuenta cuántos contenedores en SQLite tienen asignado el pool indicado.
+     */
+    public int countContainersUsingPool(String poolId) {
+        if (poolId == null) return 0;
+        String sql = "SELECT COUNT(*) FROM containers WHERE loot_pool_id = ?";
+        try (Connection conn = databaseManager.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, poolId.toLowerCase());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1);
             }
         } catch (SQLException e) {
-            plugin.getLogger().log(Level.SEVERE, "Error al eliminar el Loot Pool: " + poolId, e);
+            plugin.getLogger().log(Level.WARNING, "Error al contar contenedores que usan el pool " + poolId, e);
         }
+        return 0;
+    }
+
+    /**
+     * Elimina el Loot Pool desvinculando de forma atómica y transaccional todos los contenedores que lo utilizaban.
+     * Preserva intactos: loot_table_id, source, status, managed, registered, refill_enabled, next_refill.
+     *
+     * @param poolId ID del pool a eliminar
+     * @return cantidad de contenedores desvinculados en base de datos (-1 si ocurrió un error)
+     */
+    public int deletePoolAndUnlink(String poolId) {
+        if (poolId == null) return 0;
+        String normalizedId = poolId.toLowerCase().trim();
+
+        try (Connection conn = databaseManager.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // 1. Desvincular de los contenedores sin tocar ningún otro campo
+                int unlinked = 0;
+                String unlinkSql = "UPDATE containers SET loot_pool_id = NULL, updated_at = ? WHERE loot_pool_id = ?";
+                try (PreparedStatement stmt = conn.prepareStatement(unlinkSql)) {
+                    stmt.setLong(1, System.currentTimeMillis());
+                    stmt.setString(2, normalizedId);
+                    unlinked = stmt.executeUpdate();
+                }
+
+                // 2. Eliminar entradas asociadas del pool
+                try (PreparedStatement stmt = conn.prepareStatement("DELETE FROM loot_pool_entries WHERE pool_id = ?")) {
+                    stmt.setString(1, normalizedId);
+                    stmt.executeUpdate();
+                }
+
+                // 3. Eliminar el registro del pool
+                try (PreparedStatement stmt = conn.prepareStatement("DELETE FROM loot_pools WHERE id = ?")) {
+                    stmt.setString(1, normalizedId);
+                    stmt.executeUpdate();
+                }
+
+                conn.commit();
+                return unlinked;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Error al eliminar y desvincular el Loot Pool: " + poolId, e);
+            return -1;
+        }
+    }
+
+    public void deletePool(String poolId) {
+        deletePoolAndUnlink(poolId);
     }
 }

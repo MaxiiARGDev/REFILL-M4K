@@ -272,18 +272,46 @@ Existing commands should remain compatible unless explicitly changed.
 ## 14. GUI Layer
 
 ```text
-Player
- ↓
-Admin GUI
- ↓
-Manager / Service
- ↓
-Business logic
- ↓
-Persistence / Runtime
+Player (Admin)
+     │
+     ▼
+ AdminMenu
+     │
+     ├──► LootPoolsMenu ──► LootPoolEditorMenu / LootPoolMembersMenu ──► ConfirmationMenu
+     │
+     └──► ContainerMenu
+               │
+               ├──► ContainerFilterMenu (Filters, Sorting, Search)
+               │         │
+               │         └──► SelectPoolFilterMenu / SelectTableFilterMenu
+               │
+               └──► ContainerDetailMenu (Inspector & Actions)
+                         │
+                         ├──► SelectPoolMenu / SelectTableMenu
+                         ├──► RefillManager.refillContainer()
+                         ├──► ContainerPopulator.populate()
+                         └──► ConfirmationMenu (PLAYER → MAP, Unregister)
 ```
 
-GUI code should not duplicate database business logic.
+Container Manager 2.0 Pipeline:
+
+```text
+ContainerMenu / ContainerDetailMenu
+    ↓
+ContainerFilter
+    ↓
+ContainerManager
+    ↓
+LootContainer (in-memory)
+    ↓
+SQLite Storage (DatabaseManager)
+```
+
+Principles:
+- GUI code does not duplicate database business logic.
+- GUI operations run strictly on the Bukkit Main Thread.
+- No chunk loading occurs during routine GUI inspections or navigation.
+- Critical operations are protected with atomic confirmation modals (`ConfirmationMenu`).
 
 ## 15. Design Principles
 
