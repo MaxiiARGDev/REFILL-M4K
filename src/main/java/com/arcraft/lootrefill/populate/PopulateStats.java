@@ -25,7 +25,7 @@ public class PopulateStats {
         switch (result) {
             case POPULATED -> populated.incrementAndGet();
             case SKIPPED_NOT_EMPTY -> skippedNotEmpty.incrementAndGet();
-            case SKIPPED_NO_LOOT_TABLE -> skippedNoLootTable.incrementAndGet();
+            case SKIPPED_NO_LOOT_TABLE, SKIPPED_INVALID_LOOT_POOL -> skippedNoLootTable.incrementAndGet();
             case SKIPPED_PLAYER -> skippedPlayer.incrementAndGet();
             case SKIPPED_BROKEN -> skippedBroken.incrementAndGet();
             case SKIPPED_DISABLED -> skippedDisabled.incrementAndGet();
